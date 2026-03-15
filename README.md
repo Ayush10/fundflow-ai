@@ -1,154 +1,237 @@
 # FundFlow AI
 
-**Autonomous On-Chain Grant Allocator on Solana**
+**Autonomous On-Chain Grant Allocator with Multi-Agent Due Diligence on Solana**
 
-An AI agent that autonomously evaluates funding proposals, verifies applicant humanity, researches project viability via web APIs, and disburses USDC from a Solana treasury with full on-chain audit trails — while idle funds earn yield on Meteora.
+> **New build** for the [Intelligence at the Frontier](https://intelligence-at-the-frontier-hackathon.devspot.app/) hackathon, March 14-15, 2026.
 
-Built for the [Intelligence at the Frontier](https://intelligence-at-the-frontier-hackathon.devspot.app/) hackathon (Funding the Commons x Protocol Labs), March 14-15, 2026.
+**Live Demo**: [fundflow.ayushojha.com](https://fundflow.ayushojha.com)
+**GitHub**: [github.com/Ayush10/fundflow-ai](https://github.com/Ayush10/fundflow-ai)
+
+---
+
+## What Is FundFlow AI?
+
+FundFlow AI is an autonomous treasury infrastructure where **5 AI agents collaboratively evaluate grant proposals**, verify founder identities, research applicant credentials across 6 web platforms, debate findings in real-time with voice narration, and execute USDC disbursements on Solana — all without human intervention.
+
+Every decision is minted as an immutable **Metaplex Core NFT** on-chain. Idle treasury funds earn yield via **Meteora** dynamic vaults. The system includes a full banking-grade treasury with transaction ledger, fund allocation pools, milestone-based funding, and multi-sig approvals.
+
+**This is not a dashboard or chatbot.** The agents take action: they vote on proposals, move funds, evaluate work, explain their reasoning aloud, and coordinate with each other before rendering a verdict.
 
 ---
 
 ## The Problem
 
-Grant programs and DAOs face three critical challenges:
+Grant programs and DAOs face critical challenges:
 
-1. **Manual review bottleneck** — Human reviewers can't keep up with proposal volume. Decisions take weeks, and quality is inconsistent.
-2. **Sybil attacks** — Without identity verification, bad actors submit duplicate proposals or use sock puppet accounts to drain treasuries.
-3. **Idle capital** — Treasury funds sit earning nothing between disbursements. In DeFi, every dollar should be working.
+1. **Manual review bottleneck** — Human reviewers can't keep up. Decisions take weeks and quality is inconsistent
+2. **Sybil attacks** — Without identity verification, bad actors drain treasuries with fake proposals
+3. **No due diligence** — Reviewers don't have time to research every applicant across GitHub, Twitter, LinkedIn, Reddit, HackerNews, and Y Combinator
+4. **Idle capital** — Treasury funds sit earning nothing between disbursements
+5. **No audit trail** — Decisions are made off-chain with no verifiable record
 
 ## The Solution
 
-FundFlow AI replaces the manual review pipeline with an autonomous agent that:
-
-1. **Verifies humanity** — Every applicant must pass a Human Passport check via human.tech before their proposal enters the queue
-2. **Researches the applicant** — The agent uses Unbrowse to pull GitHub commit history, LinkedIn employment data, and Twitter community standing
-3. **Evaluates with AI** — GPT-4o scores each proposal across 5 weighted criteria and generates a decision rationale
-4. **Disburses autonomously** — Approved proposals (score >= 70) trigger automatic USDC transfers. Borderline proposals (50-69) are flagged for human review. Low scores (<50) are auto-rejected.
-5. **Logs everything on-chain** — Every decision is minted as a Metaplex Core asset with score, rationale, timestamp, and applicant data
-6. **Earns yield on idle funds** — Treasury USDC not actively being disbursed is deposited into Meteora dynamic vaults
-
----
-
-## How It Works
+FundFlow AI replaces the entire manual pipeline with an autonomous agent council:
 
 ```
-Proposal Submitted (text or voice pitch)
+Proposal Submitted
        |
        v
-[1. Human Passport Check] --FAIL--> Reject (sybil detected)
+[1. Human Passport Check] ──FAIL──> Reject (Sybil detected, no funds at risk)
        |
       PASS
        |
        v
-[2. Unbrowse Research]
-  - GitHub: commit frequency, repo stars, languages
-  - LinkedIn: headline, employment, connections
-  - Twitter/X: follower count, engagement level
+[2. Multi-Agent Due Diligence] ── 5 agents, 6 platforms, parallel research
+  |── Scout: X/Twitter + GitHub (Unbrowse browser agent)
+  |── Digger: Reddit + HackerNews (Unbrowse browser agent)
+  |── Verifier: Google + Y Combinator (Unbrowse browser agent)
+  |── Analyst: Cross-references findings, checks partner DB + founder history
+  |── Judge: Renders verdict after agents debate
        |
        v
-[3. AI Evaluation (GPT-4o)]
-  Score 0-100 across 5 criteria:
-  - Impact potential (25%)
-  - Technical feasibility (20%)
-  - Team credibility (25%)
-  - Budget reasonableness (15%)
-  - Mission alignment (15%)
+[3. Agent Council Debate] ── GPT-4o generates natural multi-agent dialogue
+  |── Agents discuss discoveries via ElevenLabs TTS (per-agent voices)
+  |── Challenge, verify, agree on findings
+  |── Vote: 80%+ council approval required
        |
        v
-[4. Decision Engine]
-  >= 70: Auto-approve + disburse USDC
-  50-69: Flag for human review
-  < 50:  Auto-reject with rationale
+[4. Reputation Scoring] ── Composite score from:
+  |── Platform presence (6 platforms)
+  |── Sentiment analysis
+  |── Verification confidence
+  |── Community engagement (Reddit + HN)
+  |── Track record (GitHub + YC + Google + partner DB + prior history)
        |
        v
-[5. On-Chain Actions]
-  - Mint Metaplex Core asset (decision record)
-  - Transfer USDC from treasury (if approved)
-  - Rebalance Meteora vault (if funds moved)
-  - Agent narrates decision via ElevenLabs TTS
+[5. AI Evaluation (GPT-4o)] ── 5 weighted criteria + risk assessment
+       |
+       v
+[6. Decision Engine]
+  >= 80%: Auto-approve (proportional funding: amount * score/100)
+  50-79%: Flag for human review
+  < 50%:  Auto-reject with rationale
+       |
+       v
+[7. On-Chain Actions]
+  |── Mint Metaplex Core NFT (immutable decision record)
+  |── Register agent identity in Metaplex Agent Registry
+  |── Transfer USDC via SPL Token (milestone tranche 1/3)
+  |── Auto-rebalance Meteora vault (62/38 liquid-to-vault ratio)
+  |── Log to PostgreSQL + transaction ledger
+  |── Update founder profile in database
+  |── Narrate verdict via ElevenLabs TTS
 ```
 
 ---
 
-## System Architecture
+## Architecture
 
 ```
-+----------------------------------------------------------+
-|          Frontend (Next.js + ElevenLabs Voice)            |
-|   Dashboard, proposal submission, voice pitch, audit     |
-+---------------------------+------------------------------+
-                            |
-                            v
-+----------------------------------------------------------+
-|       Agent Orchestrator (AsyncGenerator Pipeline)       |
-|   5-step sequential pipeline with SSE event streaming    |
-+----------+----------------+----------------+-------------+
-           |                |                |
-           v                v                v
-  +----------------+ +-------------+ +----------------+
-  |  human.tech    | |  Unbrowse   | |  ElevenLabs    |
-  |  Sybil-proof   | |  Web data   | |  Voice pitch   |
-  |  identity      | |  research   | |  + narration   |
-  +----------------+ +-------------+ +----------------+
-                            |
-                            v
-+----------------------------------------------------------+
-|            Solana On-Chain Layer (Devnet)                 |
-|  +----------------+ +------------------+ +-------------+ |
-|  | Metaplex Core  | | SPL Treasury     | | Meteora     | |
-|  | audit records  | | USDC escrow      | | yield vault | |
-|  +----------------+ +------------------+ +-------------+ |
-+----------------------------------------------------------+
+┌────────────────────────────────────────────────────────────────────┐
+│                    Frontend (Next.js 16 + React 19)                │
+│  Dashboard │ Proposals │ Treasury │ Founders │ Audit │ Guided Tour │
+│  Real-time SSE streaming │ Framer Motion │ Tailwind CSS 4          │
+└────────────────────────┬───────────────────────────────────────────┘
+                         │
+                         ▼
+┌────────────────────────────────────────────────────────────────────┐
+│              Multi-Agent Orchestrator (TypeScript)                  │
+│                                                                    │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
+│  │  Scout   │ │  Digger  │ │ Verifier │ │ Analyst  │ │  Judge  │ │
+│  │ Twitter  │ │  Reddit  │ │  Google  │ │ Synth.   │ │ Verdict │ │
+│  │ GitHub   │ │   HN     │ │   YC     │ │ Partners │ │ Funding │ │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬────┘ │
+│       │            │            │             │            │      │
+│       └────────────┴────────────┴─────────────┴────────────┘      │
+│                         ▼                                          │
+│              GPT-4o Debate Script + ElevenLabs TTS                 │
+│              Reputation Score + Risk Assessment                    │
+│              Partner Database (10 orgs) + Founder History           │
+└──────────┬─────────────┬──────────────┬──────────────┬────────────┘
+           │             │              │              │
+           ▼             ▼              ▼              ▼
+    ┌────────────┐ ┌───────────┐ ┌───────────┐ ┌────────────┐
+    │  Unbrowse  │ │  Solana   │ │ Metaplex  │ │  Meteora   │
+    │  Browser   │ │  Devnet   │ │   Core    │ │  Yield     │
+    │  Agent     │ │  USDC SPL │ │  NFT Mint │ │  Vault     │
+    │  6969      │ │  Treasury │ │  Registry │ │  Auto-Bal  │
+    └────────────┘ └───────────┘ └───────────┘ └────────────┘
+           │             │              │              │
+           └─────────────┴──────────────┴──────────────┘
+                                │
+                                ▼
+                    ┌───────────────────────┐
+                    │     PostgreSQL        │
+                    │  13 tables, write-    │
+                    │  through cache        │
+                    └───────────────────────┘
 ```
 
 ---
 
-## Features
+## Sponsor Integrations (6 Live)
 
-### AI-Powered Evaluation
-- GPT-4o evaluates proposals with structured 5-criteria scoring
-- Each criterion scored 0-100 with weighted overall score
-- Generates natural language rationale for every decision
-- Falls back to heuristic scoring if API is unavailable
+Every sponsor technology is deeply integrated — not just imported, but core to the autonomous pipeline.
 
-### Real-Time Agent Workflow
-- Server-Sent Events (SSE) stream each pipeline step to the frontend
-- Animated step-by-step visualization: human check -> research -> scoring -> decision -> on-chain
-- Scores animate as bars filling up in real-time
+### Unbrowse — Browser Agent ($1,500 challenge)
+**Novel use case: Autonomous due diligence via browser agent**
+- Unbrowse CLI runs inside the Docker container with Chromium, serving on port 6969
+- 5 AI agents make parallel `POST /resolve` calls with targeted extraction intents
+- **6 platforms scraped concurrently**: X/Twitter, GitHub, Reddit, HackerNews, Google, Y Combinator
+- Each platform gets a specialized intent prompt for structured JSON extraction
+- Results feed directly into reputation scoring and the GPT-4o evaluation prompt
+- Graceful fallback to deterministic profiles when Unbrowse is offline
+- `src/lib/integrations/platforms.ts` — 6 platform-specific research functions
+- `src/lib/integrations/unbrowse.ts` — Original 3-platform research (GitHub/LinkedIn/Twitter)
 
-### Voice Integration (ElevenLabs)
-- **Speech-to-Text**: Applicants record a 2-minute voice pitch via browser microphone
-- **Text-to-Speech**: Agent narrates the decision rationale with a selected voice
-- Audio player on proposal detail page for narration playback
+### Solana + Metaplex — On-Chain Agent ($5,000 challenge)
+**Agent registration + immutable NFT audit trail + USDC disbursements**
+- **Metaplex Agent Registry**: FundFlow AI agent registered as an on-chain identity via `registerIdentityV1`
+- **Metaplex Core NFTs**: Every decision minted as a Core asset with attributes (score, rationale, timestamps, wallet, decision)
+- **SPL Token transfers**: Real USDC disbursements from treasury to applicant wallets
+- **Transaction hashes**: Every mint and transfer verifiable on Solana Explorer (devnet)
+- Agent identity viewable on-chain at its registered asset address
+- `src/lib/solana/agent-registry.ts` — Agent registration and identity management
+- `src/lib/solana/metaplex.ts` — Core asset minting with decision attributes
+- `src/lib/solana/treasury.ts` — USDC SPL token disbursement logic
 
-### Solana Wallet Connect
-- Phantom wallet adapter integration
-- Connect/disconnect from the navbar
-- Auto-fills applicant wallet address on proposal submission
+### Meteora — DeFi Yield ($1,000 challenge)
+**Autonomous treasury yield optimization**
+- Idle USDC auto-deposited into Meteora dynamic vaults (~4.5% APY)
+- 62% liquid / 38% vault target allocation maintained automatically
+- $9,000 minimum liquid buffer enforced
+- Auto-rebalance after every disbursement
+- Yield accrual tracked in transaction ledger with daily entries
+- Withdraw-on-demand when approved grants exceed liquid balance
+- `src/lib/solana/meteora.ts` — Vault deposit/withdraw/rebalance logic
 
-### Treasury Management
-- Real-time treasury balance dashboard
-- Deposit/withdraw to Meteora yield vault with amount inputs
-- Auto-rebalancing after disbursements (62% liquid / 38% vault target)
-- Yield accrual tracking
+### ElevenLabs — Multi-Voice AI Narration
+**5 distinct agent voices narrating discoveries in real-time**
+- Each of the 5 agents has a unique ElevenLabs voice ID (Rachel, Antoni, Arnold, Adam, custom)
+- Key discovery moments are narrated per-agent (Scout finds GitHub, Digger finds Reddit, etc.)
+- Judge delivers the final verdict narration
+- Voice pitch transcription (STT) for proposal submission
+- Guided audio tour of the entire dashboard generated via ElevenLabs TTS
+- `src/lib/voice/elevenlabs.ts` — TTS/STT + `narrateShort()` for agent clips
 
-### On-Chain Audit Trail
-- Every decision minted as a Metaplex Core asset
-- Attributes: score, rationale, timestamp, proposal hash, applicant wallet, decision
-- Filterable audit log (approved/rejected/flagged)
-- Expandable detail view with Solana Explorer links
+### human.tech (Passport) — Sybil Resistance
+**Pre-screening that blocks bots before any capital is at risk**
+- Gitcoin Passport API integration via human.tech with scorer ID
+- Humanity score threshold (configurable, currently 20)
+- Sybil wallets rejected BEFORE due diligence begins — zero cost
+- Real passport verification on Solana devnet
+- `src/lib/integrations/human-tech.ts` — Passport.xyz API integration
 
-### Sybil Resistance
-- human.tech Human Passport verification on every applicant
-- Minimum Humanity Score threshold (configurable, default 65)
-- Blocks bot/sybil wallet addresses
+### OpenAI GPT-4o — AI Evaluation + Debate
+**5-criteria scoring + natural multi-agent debate generation**
+- Evaluates proposals across: Impact, Feasibility, Credibility, Budget, Mission
+- Generates natural debate scripts between 5 agents based on research data
+- Risk assessment: budget, team, timeline, market risk dimensions with flags
+- Reputation-aware: feeds platform data and partner matches into the prompt
+- `src/lib/agent/evaluator.ts` — Scoring engine with heuristic fallback
+- `src/lib/agent/multi-agent.ts` — GPT-4o debate generation
 
-### Applicant Research
-- Unbrowse pulls GitHub, LinkedIn, and Twitter data
-- Commit frequency, repo stars, top languages
-- Employment verification, headline, connections
-- Follower count, engagement level
-- Research data feeds directly into AI evaluation prompt
+---
+
+## Key Features
+
+### Multi-Agent Council
+5 specialized AI agents (Scout, Digger, Verifier, Analyst, Judge) research, debate, and vote on every proposal. Each has a persona, role, and ElevenLabs voice. The conversation streams in real-time via SSE.
+
+### Treasury Banking Infrastructure
+Full banking-grade system: transaction ledger, 4 fund allocation pools (DeFi, Public Goods, Research, Community), balance sheet, treasury alerts (low balance, pool depletion), and multi-sig approvals for large disbursements (>$15K).
+
+### Milestone-Based Funding
+Approved grants are split into 3 tranches (30/30/40%). Tranche 1 auto-disburses. Tranches 2-3 require milestone verification by the agent council before release.
+
+### Founder Profiles + Reputation Database
+Every applicant gets a persistent founder profile stored in PostgreSQL. Platform presence, reputation score, proposal history, and funding track record persist across proposals and restarts. Prior rejections lower future reputation; prior approvals boost it.
+
+### Partner Database
+10 known-good organizations (Y Combinator, Solana Foundation, a16z, Gitcoin, Protocol Labs, etc.) with trust boost scores. Proposals mentioning partners get credibility boosts.
+
+### Risk Assessment
+4-dimension risk scoring (budget, team, timeline, market) with flags for large requests, missing milestones, urgency language, and unproven concepts.
+
+### Guided Audio Tour
+ElevenLabs-narrated tour of the entire dashboard with auto-scrolling highlights and subtitles. Synced to 8 dashboard sections, each labeled with its sponsor.
+
+### Auto-Categorize into Fund Pools
+Proposals are automatically classified into DeFi, Public Goods, Research, or Community pools based on keyword analysis. Pool budgets track allocation and depletion.
+
+### PDF Due Diligence Reports
+One-click downloadable PDF for every evaluated proposal: full scores, agent conversation, research data, decision rationale, on-chain transaction hashes.
+
+### PostgreSQL Persistence
+Write-through cache: reads from in-memory store, writes to both memory and PostgreSQL (13 tables). Founders, transactions, and audit records survive container restarts.
+
+### Comments & Notes
+Judges can annotate proposals with text notes. Comments persist and are visible in the proposal detail view.
+
+### Activity Feed
+Real-time feed of all system activity: proposals submitted, evaluations completed, disbursements made, milestones verified, comments added. Auto-refreshes every 8 seconds.
 
 ---
 
@@ -156,256 +239,98 @@ Proposal Submitted (text or voice pitch)
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Frontend | Next.js 16, React 19, Tailwind CSS 4 | Dashboard, forms, real-time UI |
-| Animations | Framer Motion | Page transitions, score bar animations, workflow steps |
-| Icons | Lucide React | Consistent icon system |
-| AI Evaluation | OpenAI GPT-4o | Proposal scoring and rationale generation |
-| Voice | ElevenLabs API | STT (voice pitch) + TTS (decision narration) |
-| Identity | human.tech | Human Passport sybil-resistance |
-| Research | Unbrowse | Autonomous web data extraction |
-| Blockchain | Solana Web3.js, SPL Token | Treasury management, USDC transfers |
-| NFT Audit | Metaplex Core | Decision record minting |
-| DeFi Yield | Meteora SDK | Dynamic vault yield optimization |
-| Wallet | Solana Wallet Adapter | Phantom/Solflare connection |
-| Validation | Zod | API request/response validation |
-| Language | TypeScript | End-to-end type safety |
+| **Frontend** | Next.js 16, React 19, Tailwind CSS 4 | Dashboard, forms, real-time UI |
+| **Animations** | Framer Motion | Page transitions, score animations, tour highlights |
+| **AI Evaluation** | OpenAI GPT-4o | Proposal scoring, debate generation, risk assessment |
+| **Multi-Agent** | Custom TypeScript orchestrator | 5-agent council with SSE event streaming |
+| **Voice** | ElevenLabs API | 5-voice STT/TTS, guided tour narration |
+| **Identity** | human.tech (Passport) | Sybil-resistant humanity verification |
+| **Research** | Unbrowse | Browser agent, 6-platform web scraping |
+| **Blockchain** | Solana Web3.js, SPL Token | Treasury management, USDC transfers |
+| **NFT Audit** | Metaplex Core + Agent Registry | Immutable decision records, agent identity |
+| **DeFi Yield** | Meteora | Dynamic vault yield optimization |
+| **Database** | PostgreSQL | 13-table schema, write-through persistence |
+| **Deployment** | Docker + Coolify | Bookworm-slim with Chromium for Unbrowse |
 
 ---
 
-## Project Structure
-
-```
-fundflow-ai/
-├── src/
-│   ├── app/                          # Next.js App Router
-│   │   ├── page.tsx                  # Dashboard (stats, recent proposals, audit)
-│   │   ├── layout.tsx                # Root layout (wallet provider, navbar, toasts)
-│   │   ├── proposals/
-│   │   │   ├── page.tsx              # Proposal list with filters
-│   │   │   ├── new/page.tsx          # Submit proposal form + voice recorder
-│   │   │   └── [id]/page.tsx         # Proposal detail + agent workflow viz
-│   │   ├── treasury/page.tsx         # Treasury dashboard + vault actions
-│   │   ├── audit/page.tsx            # On-chain audit trail viewer
-│   │   └── api/                      # API routes (12 endpoints)
-│   │       ├── proposals/            # CRUD + evaluate + SSE stream
-│   │       ├── treasury/             # Balance + deposit + withdraw
-│   │       ├── audit/                # List + detail by asset address
-│   │       └── voice/                # Transcribe (STT) + narrate (TTS)
-│   ├── components/
-│   │   ├── layout/                   # Navbar, WalletProvider, WalletButton
-│   │   ├── proposals/                # AgentWorkflow (the demo showpiece)
-│   │   ├── ui/                       # Card, StatusBadge, ScoreBar, StatCard,
-│   │   │                             # Toast, LoadingSpinner, ErrorBoundary
-│   │   └── voice/                    # VoiceRecorder, NarrationPlayer
-│   ├── lib/
-│   │   ├── agent/
-│   │   │   ├── orchestrator.ts       # 5-step async pipeline with SSE events
-│   │   │   └── evaluator.ts          # GPT-4o scoring + heuristic fallback
-│   │   ├── integrations/
-│   │   │   ├── human-tech.ts         # Human Passport verification
-│   │   │   └── unbrowse.ts           # Web research (GitHub/LinkedIn/Twitter)
-│   │   ├── solana/
-│   │   │   ├── metaplex.ts           # Core asset minting (audit records)
-│   │   │   ├── treasury.ts           # USDC disbursement logic
-│   │   │   └── meteora.ts            # Yield vault deposit/withdraw/rebalance
-│   │   ├── voice/
-│   │   │   └── elevenlabs.ts         # ElevenLabs STT + TTS integration
-│   │   ├── api.ts                    # Frontend API client (mock/real toggle)
-│   │   ├── config.ts                 # Environment config + feature toggles
-│   │   ├── store.ts                  # In-memory data store + SSE events
-│   │   └── utils.ts                  # Formatting, hashing, color helpers
-│   ├── mocks/
-│   │   └── data.ts                   # Seed data (5 proposals, 3 audit records)
-│   └── types/
-│       └── api.ts                    # Shared TypeScript interfaces
-├── .env.local.example                # Environment variable template
-├── package.json
-└── README.md
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm
-
-### Installation
-
-```bash
-git clone https://github.com/Ayush10/fundflow-ai.git
-cd fundflow-ai
-npm install
-```
-
-### Environment Setup
-
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local` with your API keys:
-
-```env
-# Required for AI evaluation
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o
-
-# Required for voice features
-ELEVENLABS_API_KEY=sk_...
-ELEVENLABS_VOICE_ID=...
-
-# Optional — each has a simulated fallback
-HUMAN_TECH_API_KEY=          # human.tech verification
-UNBROWSE_API_KEY=            # web research
-SOLANA_PRIVATE_KEY=          # devnet wallet (base58)
-TREASURY_WALLET_ADDRESS=     # treasury public key
-USDC_MINT_ADDRESS=           # devnet mock USDC mint
-
-# Feature toggles (true = use real API, false = simulated fallback)
-ENABLE_REAL_ANTHROPIC=true   # enables GPT-4o evaluation
-ENABLE_REAL_ELEVENLABS=true  # enables real TTS/STT
-ENABLE_REAL_HUMAN_TECH=false
-ENABLE_REAL_UNBROWSE=false
-ENABLE_REAL_SOLANA=false
-ENABLE_REAL_METEORA=false
-
-# Frontend
-NEXT_PUBLIC_USE_MOCK=false   # false = use real API routes
-NEXT_PUBLIC_SOLANA_NETWORK=devnet
-```
-
-Every integration has an independent toggle. You can run the full demo with zero API keys — all integrations fall back to deterministic simulations.
-
-### Run Development Server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-### Production Build
-
-```bash
-npm run build
-npm run start
-```
-
----
-
-## API Endpoints
+## API Endpoints (20+)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/proposals` | List all proposals |
 | `POST` | `/api/proposals` | Submit a new proposal |
 | `GET` | `/api/proposals/[id]` | Get proposal with decision |
-| `POST` | `/api/proposals/[id]/evaluate` | Trigger agent evaluation pipeline |
-| `GET` | `/api/proposals/[id]/stream` | SSE stream of agent workflow events |
-| `GET` | `/api/treasury` | Get treasury balance + vault state |
-| `POST` | `/api/treasury/deposit` | Deposit USDC to Meteora vault |
-| `POST` | `/api/treasury/withdraw` | Withdraw USDC from Meteora vault |
-| `GET` | `/api/audit` | List all on-chain audit records |
-| `GET` | `/api/audit/[assetAddress]` | Get specific audit record |
-| `POST` | `/api/voice/transcribe` | Transcribe voice pitch (STT) |
-| `POST` | `/api/voice/narrate` | Generate decision narration (TTS) |
+| `POST` | `/api/proposals/[id]/evaluate` | Trigger multi-agent evaluation |
+| `GET` | `/api/proposals/[id]/stream` | SSE stream of agent events |
+| `GET` | `/api/proposals/[id]/report` | Due diligence report (JSON for PDF) |
+| `GET/POST` | `/api/proposals/[id]/comments` | Judge notes/comments |
+| `GET/POST` | `/api/proposals/[id]/milestones` | Milestone tracking + verification |
+| `GET` | `/api/treasury` | Treasury balance + vault state |
+| `POST` | `/api/treasury/deposit` | Deposit to Meteora vault |
+| `POST` | `/api/treasury/withdraw` | Withdraw from vault |
+| `GET` | `/api/treasury/transactions` | Full transaction ledger |
+| `GET` | `/api/treasury/pools` | Fund allocation pools |
+| `GET` | `/api/treasury/alerts` | Treasury health alerts |
+| `GET/POST` | `/api/treasury/approvals` | Multi-sig approval queue |
+| `GET` | `/api/audit` | On-chain audit records |
+| `GET` | `/api/audit/[assetAddress]` | Audit record by Metaplex asset |
+| `GET` | `/api/founders` | All founder profiles |
+| `GET` | `/api/founders/[wallet]` | Founder detail + proposal history |
+| `GET/POST` | `/api/agent` | Agent registry (register/check) |
+| `GET` | `/api/activity` | Live activity feed |
+| `GET` | `/api/tour` | Guided tour audio + segments |
+| `POST` | `/api/voice/transcribe` | Voice pitch STT |
+| `POST` | `/api/voice/narrate` | Decision narration TTS |
 
 ---
 
-## Integration Details
+## Demo Data
 
-### OpenAI (GPT-4o) — AI Evaluation
+The system comes pre-populated with realistic data showcasing every feature:
 
-The agent sends a structured prompt to GPT-4o containing the full proposal text, human verification data, and Unbrowse research results. GPT-4o returns a JSON object with 5 criterion scores (0-100 each), a weighted overall score, and a natural language rationale.
-
-If the API is unavailable, the evaluator falls back to a heuristic scoring system that uses keyword analysis, research signals, and budget thresholds to generate deterministic scores.
-
-### ElevenLabs — Voice
-
-**STT (Speech-to-Text)**: Uses the `scribe_v1` model. Applicants record a voice pitch in the browser, the audio blob is uploaded and forwarded to ElevenLabs for transcription. The transcript feeds into the AI evaluation.
-
-**TTS (Text-to-Speech)**: Uses the `eleven_multilingual_v2` model. After the agent renders a decision, the rationale text is converted to speech. The MP3 audio is stored as a data URL on the decision record and played back on the proposal detail page.
-
-### human.tech — Sybil Resistance
-
-Verifies that the applicant wallet belongs to a real human using the Human Passport API. Returns a humanity score (0-100) and a verified boolean. Proposals from applicants below the minimum threshold (default 65) are auto-rejected.
-
-### Unbrowse — Web Research
-
-Autonomously researches the applicant's web presence by reverse-engineering GitHub, LinkedIn, and Twitter APIs. Returns structured data (repos, stars, commit frequency, employment, followers, engagement) that feeds directly into the AI evaluation prompt and the team credibility score.
-
-### Metaplex Core — Audit Trail
-
-Every agent decision is minted as a Metaplex Core asset on Solana devnet. Asset attributes store the score, rationale, timestamp, proposal hash, applicant wallet, and decision outcome. These records are immutable, publicly queryable, and form the verifiable audit trail.
-
-### Meteora — Yield Optimization
-
-Idle treasury USDC is auto-deposited into a Meteora dynamic vault. The agent maintains a 62% liquid / 38% vault target allocation, rebalances after each disbursement, and enforces a minimum 9,000 USDC liquid buffer. Yield is tracked and displayed on the treasury dashboard.
-
----
-
-## Graceful Fallback System
-
-Every external integration has an independent feature toggle and a deterministic fallback:
-
-| Integration | Toggle | Fallback Behavior |
-|-------------|--------|-------------------|
-| OpenAI | `ENABLE_REAL_ANTHROPIC` | Heuristic scoring based on keywords, research signals, budget |
-| ElevenLabs | `ENABLE_REAL_ELEVENLABS` | Silent WAV placeholder + text-based transcript |
-| human.tech | `ENABLE_REAL_HUMAN_TECH` | Deterministic score derived from wallet address hash |
-| Unbrowse | `ENABLE_REAL_UNBROWSE` | Profile generated from proposal text (languages, keywords) |
-| Solana | `ENABLE_REAL_SOLANA` | Simulated signatures, in-memory state |
-| Meteora | `ENABLE_REAL_METEORA` | Simulated vault with 0.045% yield per deposit |
-
-The demo always works, even with zero API keys or no internet connectivity.
-
----
-
-## Demo Flow (3 Minutes)
-
-1. **0:00-0:30** — Problem: manual review waste, sybil attacks, idle treasury funds
-2. **0:30-1:00** — Treasury dashboard: USDC balance, Meteora vault earning yield
-3. **1:00-1:30** — Submit a proposal (text or voice pitch via ElevenLabs)
-4. **1:30-2:00** — Watch the agent work in real-time:
-   - Human Passport check (green checkmark)
-   - Unbrowse research (GitHub/LinkedIn/Twitter cards appear)
-   - AI scoring (bars fill up for each criterion)
-5. **2:00-2:30** — Decision rendered: approved, score 84/100. USDC transfers. Decision minted on-chain. Agent narrates the rationale via TTS.
-6. **2:30-3:00** — Audit trail: on-chain records. Meteora vault rebalances. Vision: trustless, transparent capital allocation.
+- **8 founders**: YC-backed Sarah Chen (rep 92), Gitcoin veteran Priya Sharma (rep 89), ex-Paradigm James Liu (rep 78), ZK researcher Elena Kowalski (rep 72), community builder Dev Singh (rep 65), flagged Alex Rivera (rep 58), rejected Marcus Webb (rep 28), and a Sybil bot (rep 0)
+- **7 proposals**: 2 approved, 2 rejected, 1 flagged, 2 pending
+- **27 transactions**: Initial funding, daily yield accruals, tranche disbursements, auto-rebalances
+- **5 on-chain audit records** with full scoring breakdowns
+- **$230K total treasury assets**: $62K liquid, $165K in Meteora vault, $3K yield earned
 
 ---
 
 ## Challenge Submissions
 
 ### Metaplex Onchain Agent ($5,000)
-Every agent decision is minted as a Metaplex Core asset. The audit trail IS the Metaplex integration — each record stores score, rationale, timestamps, and wallet addresses as on-chain attributes. The FundFlow agent is registered in the Metaplex Agent Registry.
+FundFlow AI is a registered on-chain agent via the Metaplex Agent Registry. Every grant decision is minted as a Metaplex Core NFT with attributes storing score, rationale, timestamps, wallet addresses, and decision outcome. The agent identity, decision collection, and audit trail are all on-chain and verifiable on Solana Explorer.
 
-### Agentic Funding — Solana ($1,200)
-FundFlow is the textbook answer to the track description: an AI agent that holds a budget, evaluates proposals against configurable criteria, moves capital based on verifiable outcomes, and logs everything on-chain.
+### Agentic Funding & Coordination — Solana ($1,200)
+This IS the track description: autonomous agents that coordinate resources, funding, and decision-making. 5 AI agents vote on proposals, move funds, evaluate work, explain their reasoning, and coordinate with each other. Not a dashboard — agents take real action.
 
 ### Unbrowse Challenge ($1,500)
-Novel use case: autonomous due diligence. The agent uses Unbrowse to reverse-engineer GitHub, LinkedIn, and Twitter APIs to build applicant profiles. This is structured data extraction that feeds directly into the AI scoring pipeline.
+Novel use case: autonomous due diligence. The Unbrowse browser agent runs inside the Docker container, scraping 6 platforms in parallel (X, GitHub, Reddit, HackerNews, Google, Y Combinator) with targeted extraction intents. This is structured data extraction feeding directly into the AI scoring pipeline — not just browsing, but acting.
 
 ### Meteora Challenge ($1,000)
-Idle treasury USDC is auto-deposited into a Meteora dynamic vault. The agent manages yield strategy autonomously — depositing excess funds, withdrawing for disbursements, maintaining a liquid buffer, and rebalancing after each transaction.
+Idle treasury USDC is auto-deposited into Meteora dynamic vaults. The agent manages yield autonomously: depositing excess funds, withdrawing for disbursements, maintaining a $9K liquid buffer, and rebalancing after every transaction. Yield accrual tracked in the transaction ledger.
 
-### Made by Human — human.tech ($1,200)
-Every applicant must verify via Human Passport before their proposal enters the evaluation queue. This prevents sybil attacks, duplicate submissions, and bot-driven treasury exploitation.
+---
 
-### ElevenLabs Voice Challenge (Credits)
-Two-way voice integration: applicants submit voice pitches (STT transcription fed to the AI evaluator), and the agent narrates decision rationales via TTS for dashboard playback.
+## Getting Started
+
+```bash
+git clone https://github.com/Ayush10/fundflow-ai.git
+cd fundflow-ai
+npm install
+cp .env.local.example .env.local
+# Edit .env.local with your API keys
+npm run dev
+```
+
+Every integration has an independent toggle. The demo works with zero API keys — all integrations fall back to deterministic simulations.
 
 ---
 
 ## Builder
 
-**Ayush Ojha**
-- Previous hackathon wins: Agent Court (on-chain AI dispute resolution), ArbitrAgent, Orchestra
-- 7+ years fintech PM experience (Khalti, Morgan Stanley)
-- Stack: Solana/Metaplex, Next.js, TypeScript, AI/LLM integration
+**Ayush Ojha** — [ayushojha.com](https://ayushojha.com)
 
 ---
 

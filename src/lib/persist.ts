@@ -129,18 +129,18 @@ export async function loadFoundersFromDB(): Promise<FounderProfile[]> {
     const founders = await query<{
       wallet: string; name: string | null; bio: string | null;
       platforms: Record<string, unknown>; reputation_score: number;
-      first_seen: string; last_seen: string; total_funded: number; total_requested: number;
+      first_seen: unknown; last_seen: unknown; total_funded: number; total_requested: number;
     }>(`SELECT * FROM founders ORDER BY last_seen DESC`);
 
     const proposals = await query<{
       wallet: string; proposal_id: string; title: string;
-      amount: number; decision: string; score: number; date: string;
+      amount: number; decision: string; score: number; date: unknown;
     }>(`SELECT * FROM founder_proposals ORDER BY date DESC`);
 
     const proposalsByWallet = new Map<string, FounderProfile["proposals"]>();
     for (const p of proposals) {
       const list = proposalsByWallet.get(p.wallet) ?? [];
-      list.push({ id: p.proposal_id, title: p.title, amount: Number(p.amount), decision: p.decision, score: p.score, date: String(p.date) });
+      list.push({ id: p.proposal_id, title: p.title, amount: Number(p.amount), decision: p.decision, score: p.score, date: p.date instanceof Date ? p.date.toISOString() : String(p.date) });
       proposalsByWallet.set(p.wallet, list);
     }
 

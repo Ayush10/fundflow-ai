@@ -100,7 +100,6 @@ export async function registerFundFlowAgent(): Promise<{
       await registerIdentityV1(registryUmi, {
         asset: agentAsset.publicKey,
         collection: collection.publicKey,
-        agentRegistrationUri: AGENT_URI,
       }).sendAndConfirm(registryUmi);
 
       console.log("[Agent Registry] Identity registered in Agent Registry");

@@ -10,11 +10,13 @@ import {
 import {
   generateSigner,
   keypairIdentity,
+  publicKey,
 } from "@metaplex-foundation/umi";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 
 import { getAppConfig } from "@/lib/config";
 import { getSolanaConnection, getTreasuryAuthority } from "@/lib/solana";
+import { getRegisteredAgent } from "@/lib/solana/agent-registry";
 import { addAuditRecord } from "@/lib/store";
 import { createSimulatedSignature, hashText } from "@/lib/utils";
 import type { AgentDecision, AuditRecord, Proposal } from "@/types/api";
@@ -47,10 +49,17 @@ export async function mintDecisionRecord(input: {
 
       const asset = generateSigner(umi);
 
+      // Use registered collection if agent has been registered
+      const registered = getRegisteredAgent();
+      const collectionOpt = registered.collectionAddress
+        ? { collection: publicKey(registered.collectionAddress) }
+        : {};
+
       const tx = await createV1(umi, {
         asset,
         name: `FundFlow Decision: ${input.proposal.title.slice(0, 32)}`,
         uri: "",
+        ...collectionOpt,
         plugins: [
           pluginAuthorityPair({
             type: "Attributes",

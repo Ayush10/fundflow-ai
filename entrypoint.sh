@@ -1,18 +1,14 @@
 #!/bin/sh
 set -e
 
-# Start unbrowse server in background (if available)
+# Bootstrap unbrowse and warm up the server (if available)
 if command -v unbrowse >/dev/null 2>&1; then
-  echo "[entrypoint] Starting unbrowse server on port 6969..."
-  unbrowse serve --port 6969 &
-  UNBROWSE_PID=$!
-  # Give it a moment to start
-  sleep 2
-  if kill -0 "$UNBROWSE_PID" 2>/dev/null; then
-    echo "[entrypoint] Unbrowse server started (PID $UNBROWSE_PID)"
-  else
-    echo "[entrypoint] Unbrowse server failed to start, continuing without it"
-  fi
+  echo "[entrypoint] Initializing unbrowse..."
+  # Run setup to accept terms and configure
+  echo "y" | unbrowse setup --skip-browser 2>&1 || true
+  # Health check triggers auto-start of the local HTTP server on port 6969
+  unbrowse health 2>&1 || true
+  echo "[entrypoint] Unbrowse server ready on port 6969"
 else
   echo "[entrypoint] Unbrowse CLI not found, skipping (fallback mode)"
 fi

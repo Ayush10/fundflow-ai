@@ -139,7 +139,10 @@ async function executeEvaluation(proposalId: string): Promise<Proposal> {
   );
 
   // Create/update founder profile with research data
-  upsertFounder(multiAgentResult.founderProfile);
+  upsertFounder({
+    ...multiAgentResult.founderProfile,
+    wallet: record.proposal.applicantWallet,
+  });
 
   appendAgentEvent(proposalId, {
     step: "reputation-score",

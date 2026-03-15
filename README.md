@@ -87,47 +87,33 @@ Proposal Submitted
 
 ## Architecture
 
+![FundFlow AI Architecture](public/architecture.svg)
+
+<details>
+<summary>Text version</summary>
+
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                    Frontend (Next.js 16 + React 19)                │
-│  Dashboard │ Proposals │ Treasury │ Founders │ Audit │ Guided Tour │
-│  Real-time SSE streaming │ Framer Motion │ Tailwind CSS 4          │
-└────────────────────────┬───────────────────────────────────────────┘
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────────────────┐
-│              Multi-Agent Orchestrator (TypeScript)                  │
-│                                                                    │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │
-│  │  Scout   │ │  Digger  │ │ Verifier │ │ Analyst  │ │  Judge  │ │
-│  │ Twitter  │ │  Reddit  │ │  Google  │ │ Synth.   │ │ Verdict │ │
-│  │ GitHub   │ │   HN     │ │   YC     │ │ Partners │ │ Funding │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬────┘ │
-│       │            │            │             │            │      │
-│       └────────────┴────────────┴─────────────┴────────────┘      │
-│                         ▼                                          │
-│              GPT-4o Debate Script + ElevenLabs TTS                 │
-│              Reputation Score + Risk Assessment                    │
-│              Partner Database (10 orgs) + Founder History           │
-└──────────┬─────────────┬──────────────┬──────────────┬────────────┘
-           │             │              │              │
-           ▼             ▼              ▼              ▼
-    ┌────────────┐ ┌───────────┐ ┌───────────┐ ┌────────────┐
-    │  Unbrowse  │ │  Solana   │ │ Metaplex  │ │  Meteora   │
-    │  Browser   │ │  Devnet   │ │   Core    │ │  Yield     │
-    │  Agent     │ │  USDC SPL │ │  NFT Mint │ │  Vault     │
-    │  6969      │ │  Treasury │ │  Registry │ │  Auto-Bal  │
-    └────────────┘ └───────────┘ └───────────┘ └────────────┘
-           │             │              │              │
-           └─────────────┴──────────────┴──────────────┘
-                                │
-                                ▼
-                    ┌───────────────────────┐
-                    │     PostgreSQL        │
-                    │  13 tables, write-    │
-                    │  through cache        │
-                    └───────────────────────┘
+Frontend (Next.js 16 + React 19 + Tailwind CSS 4)
+  │ Dashboard │ Proposals │ Treasury │ Founders │ Audit │ Tour
+  ▼
+Step 1: Sybil Check ── human.tech Passport API ── FAIL → Reject
+  │ PASS
+  ▼
+Step 2: Multi-Agent Due Diligence ── Unbrowse browser agent (port 6969)
+  │ Scout (X + GitHub) │ Digger (Reddit + HN) │ Verifier (Google + YC)
+  │ Analyst (cross-ref + partner DB) │ Judge (verdict + ElevenLabs TTS)
+  ▼
+Step 3: AI Evaluation ── GPT-4o (5 criteria + debate + risk assessment)
+  │ + Reputation Score (platform presence + sentiment + community + track record)
+  ▼
+Step 4: Decision ── ≥80% approve (proportional) │ 50-79% flag │ <50% reject
+  ▼
+Step 5: On-Chain ── Metaplex Core NFT │ Agent Registry │ SPL USDC │ Meteora vault
+  ▼
+PostgreSQL (13 tables) + Treasury Banking (ledger + pools + milestones)
 ```
+
+</details>
 
 ---
 

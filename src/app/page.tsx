@@ -21,6 +21,7 @@ import OnChainStatus from "@/components/ui/OnChainStatus";
 import DashboardCharts from "@/components/ui/DashboardCharts";
 import ActivityFeed from "@/components/ui/ActivityFeed";
 import FundingCharts from "@/components/ui/FundingCharts";
+import SponsorShowcase from "@/components/ui/SponsorShowcase";
 import { formatUSDC, formatDate, shortenAddress, getScoreColor, solanaExplorerUrl } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -244,32 +245,8 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Tech badges */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="flex flex-wrap items-center justify-center gap-3 pt-4"
-      >
-        {[
-          "Solana Devnet",
-          "Metaplex Core",
-          "Agent Registry",
-          "Meteora",
-          "GPT-4o",
-          "human.tech",
-          "Unbrowse",
-          "ElevenLabs",
-          "SPL Token (USDC)",
-        ].map((tech) => (
-          <span
-            key={tech}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-400"
-          >
-            {tech}
-          </span>
-        ))}
-      </motion.div>
+      {/* Sponsor Integrations Showcase */}
+      <SponsorShowcase />
     </div>
   );
 }

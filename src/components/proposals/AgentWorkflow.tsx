@@ -204,12 +204,13 @@ export default function AgentWorkflow({
 
       {(isRunning || state.humanCheck.status !== "idle") && (
         <div className="space-y-3">
-          <Step1HumanCheck state={state.humanCheck} />
+          <Step1HumanCheck state={state.humanCheck} sponsor={{ name: "human.tech", color: "text-green-400" }} />
 
           {/* Multi-Agent Research + Conversation */}
           <StepWrapper
             icon={Search}
             label="Multi-Agent Due Diligence (5 Agents, 6 Platforms)"
+            sponsor={{ name: "Unbrowse", color: "text-cyan-400" }}
             status={
               state.multiAgentResearch.status === "idle"
                 ? "idle"
@@ -253,10 +254,10 @@ export default function AgentWorkflow({
             )}
           </StepWrapper>
 
-          <Step2Research state={state.research} />
-          <Step3Evaluation state={state.evaluation} />
-          <Step4Decision state={state.decision} />
-          <Step5OnChain state={state.onChain} />
+          <Step2Research state={state.research} sponsor={{ name: "Unbrowse", color: "text-cyan-400" }} />
+          <Step3Evaluation state={state.evaluation} sponsor={{ name: "GPT-4o", color: "text-purple-400" }} />
+          <Step4Decision state={state.decision} sponsor={{ name: "ElevenLabs", color: "text-violet-400" }} />
+          <Step5OnChain state={state.onChain} sponsor={{ name: "Solana + Metaplex + Meteora", color: "text-emerald-400" }} />
         </div>
       )}
     </div>
@@ -265,15 +266,26 @@ export default function AgentWorkflow({
 
 // ============ STEP COMPONENTS ============
 
+function SponsorBadge({ name, color }: { name: string; color: string }) {
+  return (
+    <span className={`ml-auto inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-medium ${color}`}>
+      <span className="h-1 w-1 rounded-full bg-current" />
+      {name}
+    </span>
+  );
+}
+
 function StepWrapper({
   icon: Icon,
   label,
   status,
+  sponsor,
   children,
 }: {
   icon: React.ElementType;
   label: string;
   status: string;
+  sponsor?: { name: string; color: string };
   children?: React.ReactNode;
 }) {
   const isIdle = status === "idle";
@@ -324,6 +336,7 @@ function StepWrapper({
         {isRunning && (
           <span className="ml-auto text-xs text-violet-400">Processing...</span>
         )}
+        {!isRunning && sponsor && <SponsorBadge name={sponsor.name} color={sponsor.color} />}
       </div>
       <AnimatePresence>
         {children && isDone && (
@@ -343,14 +356,17 @@ function StepWrapper({
 
 function Step1HumanCheck({
   state,
+  sponsor,
 }: {
   state: WorkflowState["humanCheck"];
+  sponsor?: { name: string; color: string };
 }) {
   return (
     <StepWrapper
       icon={UserCheck}
       label="Human Passport Verification"
       status={state.status}
+      sponsor={sponsor}
     >
       {state.data && (
         <div className="flex items-center gap-4 text-sm">
@@ -382,14 +398,17 @@ function Step1HumanCheck({
 
 function Step2Research({
   state,
+  sponsor,
 }: {
   state: WorkflowState["research"];
+  sponsor?: { name: string; color: string };
 }) {
   return (
     <StepWrapper
       icon={Search}
       label="Unbrowse Web Research"
       status={state.status}
+      sponsor={sponsor}
     >
       {state.data && (
         <div className="grid gap-3 sm:grid-cols-3">
@@ -446,14 +465,17 @@ function Step2Research({
 
 function Step3Evaluation({
   state,
+  sponsor,
 }: {
   state: WorkflowState["evaluation"];
+  sponsor?: { name: string; color: string };
 }) {
   return (
     <StepWrapper
       icon={Brain}
-      label="AI Evaluation (Claude)"
+      label="AI Evaluation (GPT-4o)"
       status={state.status}
+      sponsor={sponsor}
     >
       {state.data && (
         <div className="space-y-2">
@@ -507,11 +529,13 @@ function Step3Evaluation({
 
 function Step4Decision({
   state,
+  sponsor,
 }: {
   state: WorkflowState["decision"];
+  sponsor?: { name: string; color: string };
 }) {
   return (
-    <StepWrapper icon={Gavel} label="Decision" status={state.status}>
+    <StepWrapper icon={Gavel} label="Decision" status={state.status} sponsor={sponsor}>
       {state.data && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
@@ -545,8 +569,10 @@ function Step4Decision({
 
 function Step5OnChain({
   state,
+  sponsor,
 }: {
   state: WorkflowState["onChain"];
+  sponsor?: { name: string; color: string };
 }) {
   const statusText =
     state.status === "minting"
@@ -563,6 +589,7 @@ function Step5OnChain({
     <StepWrapper
       icon={LinkIcon}
       label="On-Chain Actions"
+      sponsor={sponsor}
       status={
         state.status === "idle"
           ? "idle"

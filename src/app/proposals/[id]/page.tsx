@@ -11,13 +11,14 @@ import {
   Clock,
   ExternalLink,
   Volume2,
-  Download,
 } from "lucide-react";
 import type { Proposal } from "@/types/api";
 import { getProposal } from "@/lib/api";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ScoreBar from "@/components/ui/ScoreBar";
 import AgentWorkflow from "@/components/proposals/AgentWorkflow";
+import CommentsAndMilestones from "@/components/proposals/CommentsAndMilestones";
+import DownloadReport from "@/components/proposals/DownloadReport";
 import Card, { CardHeader, CardTitle } from "@/components/ui/Card";
 import { PageLoader } from "@/components/ui/LoadingSpinner";
 import NarrationPlayer from "@/components/voice/NarrationPlayer";
@@ -104,17 +105,7 @@ export default function ProposalDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {hasDecision && (
-            <button
-              onClick={() => {
-                window.open(`/api/proposals/${id}/report`, "_blank");
-              }}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Report
-            </button>
-          )}
+          {hasDecision && <DownloadReport proposalId={id} />}
           <StatusBadge status={proposal.status} />
         </div>
       </motion.div>
@@ -268,6 +259,9 @@ export default function ProposalDetailPage() {
               </div>
             )}
           </Card>
+
+          {/* Comments & Milestones */}
+          <CommentsAndMilestones proposalId={id} />
         </motion.div>
       </div>
     </div>

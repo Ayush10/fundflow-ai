@@ -19,6 +19,8 @@ import Card, { CardHeader, CardTitle } from "@/components/ui/Card";
 import { PageLoader } from "@/components/ui/LoadingSpinner";
 import OnChainStatus from "@/components/ui/OnChainStatus";
 import DashboardCharts from "@/components/ui/DashboardCharts";
+import ActivityFeed from "@/components/ui/ActivityFeed";
+import FundingCharts from "@/components/ui/FundingCharts";
 import { formatUSDC, formatDate, shortenAddress, getScoreColor, solanaExplorerUrl } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -137,8 +139,14 @@ export default function DashboardPage() {
         />
       </motion.div>
 
+      {/* Funding Charts + Approval Rates */}
+      <FundingCharts />
+
       {/* Fund Pools + Treasury Alerts */}
       <DashboardCharts />
+
+      {/* Activity Feed */}
+      <ActivityFeed />
 
       {/* On-Chain Status */}
       <OnChainStatus />

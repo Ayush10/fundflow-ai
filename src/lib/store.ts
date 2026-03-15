@@ -19,6 +19,36 @@ import type {
 } from "@/types/api";
 import type { FounderProfile, AgentConversation, ReputationScore } from "@/types/agents";
 import type { TreasuryTransaction, FundPool, Milestone } from "@/types/treasury";
+
+// ─── Inline types for comments, activity, approvals ──────────────
+
+export interface ProposalComment {
+  id: string;
+  proposalId: string;
+  author: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface ActivityEntry {
+  id: string;
+  type: "proposal_created" | "evaluation_started" | "evaluation_complete" | "disbursement" | "milestone_verified" | "comment_added";
+  title: string;
+  description: string;
+  proposalId?: string;
+  timestamp: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  proposalId: string;
+  proposalTitle: string;
+  amount: number;
+  requiredApprovals: number;
+  approvals: string[];
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+}
 import * as persist from "@/lib/persist";
 
 interface ProposalRecord {
@@ -40,6 +70,9 @@ interface FundFlowStore {
   transactions: TreasuryTransaction[];
   fundPools: FundPool[];
   milestones: Milestone[];
+  comments: ProposalComment[];
+  activityFeed: ActivityEntry[];
+  approvalQueue: ApprovalRequest[];
 }
 
 const STORE_VERSION = "2026-03-14-cx14";
@@ -80,6 +113,9 @@ function createSeedStore(): FundFlowStore {
     transactions: seedTransactions(),
     fundPools: seedFundPools(),
     milestones: [],
+    comments: [],
+    activityFeed: seedActivity(),
+    approvalQueue: [],
   };
 }
 
@@ -458,4 +494,124 @@ export function categorizeProposal(title: string, description: string): string {
     if (score > max) { max = score; best = pool; }
   }
   return best;
+}
+
+// ─── Comments ─────────────────────────────────────────────────────
+
+export function addComment(proposalId: string, author: string, text: string): ProposalComment {
+  const comment: ProposalComment = {
+    id: createId("cmt"),
+    proposalId,
+    author,
+    text,
+    createdAt: new Date().toISOString(),
+  };
+  getStore().comments.push(comment);
+  addActivity("comment_added", `Comment on proposal`, text.slice(0, 100), proposalId);
+  return structuredClone(comment);
+}
+
+export function listComments(proposalId: string): ProposalComment[] {
+  return structuredClone(
+    getStore().comments
+      .filter((c) => c.proposalId === proposalId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  );
+}
+
+// ─── Activity Feed ────────────────────────────────────────────────
+
+function seedActivity(): ActivityEntry[] {
+  return [
+    { id: "act-001", type: "proposal_created", title: "New proposal submitted", description: "Solana Smart Contract Auditing Toolkit — $15,000", proposalId: "prop-001", timestamp: "2026-03-12T00:00:00Z" },
+    { id: "act-002", type: "evaluation_complete", title: "Evaluation complete", description: "Approved with score 82/100", proposalId: "prop-001", timestamp: "2026-03-12T00:05:00Z" },
+    { id: "act-003", type: "disbursement", title: "USDC disbursed", description: "$15,000 transferred to 8nJQk...", proposalId: "prop-001", timestamp: "2026-03-12T00:06:00Z" },
+    { id: "act-004", type: "evaluation_complete", title: "Evaluation complete", description: "Rejected with score 38/100", proposalId: "prop-002", timestamp: "2026-03-13T00:00:00Z" },
+  ];
+}
+
+export function addActivity(
+  type: ActivityEntry["type"],
+  title: string,
+  description: string,
+  proposalId?: string
+): ActivityEntry {
+  const entry: ActivityEntry = {
+    id: createId("act"),
+    type,
+    title,
+    description,
+    proposalId,
+    timestamp: new Date().toISOString(),
+  };
+  getStore().activityFeed.unshift(entry);
+  // Keep only last 50
+  if (getStore().activityFeed.length > 50) {
+    getStore().activityFeed = getStore().activityFeed.slice(0, 50);
+  }
+  return structuredClone(entry);
+}
+
+export function listActivity(limit = 20): ActivityEntry[] {
+  return structuredClone(getStore().activityFeed.slice(0, limit));
+}
+
+// ─── Multi-Sig Approval Queue ─────────────────────────────────────
+
+const MULTISIG_THRESHOLD = 15000; // require approvals for amounts above this
+const REQUIRED_APPROVALS = 2;
+
+export function requiresMultiSig(amount: number): boolean {
+  return amount >= MULTISIG_THRESHOLD;
+}
+
+export function createApprovalRequest(
+  proposalId: string,
+  proposalTitle: string,
+  amount: number
+): ApprovalRequest {
+  const req: ApprovalRequest = {
+    id: createId("appr"),
+    proposalId,
+    proposalTitle,
+    amount,
+    requiredApprovals: REQUIRED_APPROVALS,
+    approvals: [],
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  getStore().approvalQueue.push(req);
+  addActivity("proposal_created", "Multi-sig approval required", `$${amount.toLocaleString()} requires ${REQUIRED_APPROVALS} approvals`, proposalId);
+  return structuredClone(req);
+}
+
+export function approveRequest(requestId: string, approver: string): ApprovalRequest | null {
+  const store = getStore();
+  const req = store.approvalQueue.find((r) => r.id === requestId);
+  if (!req || req.status !== "pending") return null;
+  if (req.approvals.includes(approver)) return structuredClone(req); // already approved
+
+  req.approvals.push(approver);
+  if (req.approvals.length >= req.requiredApprovals) {
+    req.status = "approved";
+  }
+  return structuredClone(req);
+}
+
+export function listApprovalQueue(): ApprovalRequest[] {
+  return structuredClone(
+    getStore().approvalQueue.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  );
+}
+
+// ─── Milestone Verification ───────────────────────────────────────
+
+export function verifyMilestone(milestoneId: string): Milestone | null {
+  const store = getStore();
+  const ms = store.milestones.find((m) => m.id === milestoneId);
+  if (!ms || ms.status !== "pending") return null;
+  ms.status = "verified";
+  ms.verifiedAt = new Date().toISOString();
+  addActivity("milestone_verified", "Milestone verified", `${ms.title} — $${ms.trancheAmount.toLocaleString()} ready for release`, ms.proposalId);
+  return structuredClone(ms);
 }

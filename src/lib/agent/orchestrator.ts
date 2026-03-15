@@ -1,10 +1,13 @@
 import {
+  addActivity,
   addProposalToFounder,
   addTransaction,
   appendAgentEvent,
   categorizeProposal,
+  createApprovalRequest,
   createMilestones,
   getProposal,
+  requireMultiSig,
   requireProposalRecord,
   setProposalDecision,
   setProposalResearch,
@@ -75,6 +78,7 @@ function createFailedHumanDecision(
 async function executeEvaluation(proposalId: string): Promise<Proposal> {
   const record = requireProposalRecord(proposalId);
   setProposalStatus(proposalId, "evaluating");
+  addActivity("evaluation_started", "Evaluation started", `"${record.proposal.title}" — $${record.proposal.requestedAmount.toLocaleString()}`, proposalId);
 
   // ── Step 1: Human Check ──
 
@@ -271,6 +275,20 @@ async function executeEvaluation(proposalId: string): Promise<Proposal> {
   });
 
   setProposalDecision(proposalId, decision, minted.auditRecord);
+
+  // Log activity
+  addActivity(
+    "evaluation_complete",
+    `Evaluation complete: ${decisionType}`,
+    `"${record.proposal.title}" scored ${overallScore}/100. ${decisionType === "approved" ? `$${approvedAmount.toLocaleString()} approved (tranche 1 disbursed).` : ""}`,
+    proposalId
+  );
+
+  // Multi-sig check for large remaining tranches
+  if (decisionType === "approved" && requireMultiSig(approvedAmount)) {
+    createApprovalRequest(proposalId, record.proposal.title, approvedAmount);
+  }
+
   appendAgentEvent(proposalId, { step: "decision", status: "complete", data: decision });
   appendAgentEvent(proposalId, {
     step: "on-chain",

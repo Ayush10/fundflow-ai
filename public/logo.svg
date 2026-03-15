@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#logoGrad)"/>
+  <!-- Inner glow -->
+  <circle cx="256" cy="256" r="200" fill="rgba(0,0,0,0.3)"/>
+  <!-- Landmark/bank icon -->
+  <g transform="translate(256,240)" fill="none" stroke="url(#innerGrad)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Roof triangle -->
+    <path d="M-80,0 L0,-70 L80,0"/>
+    <!-- Pillars -->
+    <line x1="-55" y1="10" x2="-55" y2="70"/>
+    <line x1="-18" y1="10" x2="-18" y2="70"/>
+    <line x1="18" y1="10" x2="18" y2="70"/>
+    <line x1="55" y1="10" x2="55" y2="70"/>
+    <!-- Base -->
+    <line x1="-80" y1="80" x2="80" y2="80"/>
+    <!-- Top beam -->
+    <line x1="-80" y1="0" x2="80" y2="0"/>
+  </g>
+  <!-- AI sparkle dots -->
+  <circle cx="180" cy="150" r="6" fill="#a78bfa" opacity="0.8"/>
+  <circle cx="340" cy="160" r="4" fill="#22d3ee" opacity="0.7"/>
+  <circle cx="160" cy="340" r="5" fill="#06b6d4" opacity="0.6"/>
+  <circle cx="360" cy="330" r="7" fill="#8b5cf6" opacity="0.8"/>
+  <!-- Flow arrows (representing autonomous flow) -->
+  <g stroke="#22d3ee" stroke-width="3" fill="none" opacity="0.5">
+    <path d="M130,256 Q170,200 210,256"/>
+    <path d="M302,256 Q342,200 382,256"/>
+  </g>
+</svg>

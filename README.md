@@ -297,6 +297,9 @@ Novel use case: autonomous due diligence. The Unbrowse browser agent runs inside
 ### Meteora Challenge ($1,000)
 Idle treasury USDC is auto-deposited into Meteora dynamic vaults. The agent manages yield autonomously: depositing excess funds, withdrawing for disbursements, maintaining a $9K liquid buffer, and rebalancing after every transaction. Yield accrual tracked in the transaction ledger.
 
+### Made by Human — human.tech ($1,200)
+Every applicant must verify via Human Passport (passport.xyz) before their proposal enters the evaluation queue. The humanity score acts as a pre-screening gate — wallets scoring below the threshold (currently 20) are auto-rejected before any due diligence or capital movement, making Sybil attacks cost-free to defend against. Integration uses the Passport API with configurable scorer ID.
+
 ---
 
 ## Getting Started

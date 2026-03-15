@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   title: "FundFlow AI — Autonomous On-Chain Grant Allocator",
   description:
     "AI agent that evaluates funding proposals, verifies humanity, researches viability, and disburses USDC on Solana with full on-chain audit trails.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

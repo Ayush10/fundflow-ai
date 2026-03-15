@@ -75,7 +75,7 @@ interface FundFlowStore {
   approvalQueue: ApprovalRequest[];
 }
 
-const STORE_VERSION = "2026-03-14-cx14";
+const STORE_VERSION = "2026-03-15-v2";
 
 declare global {
   var __fundflowStore: FundFlowStore | undefined;
@@ -369,10 +369,10 @@ export function upsertFounder(partial: Partial<FounderProfile> & { wallet: strin
 
 function seedFundPools(): FundPool[] {
   return [
-    { id: "defi", name: "DeFi & Infrastructure", description: "Core DeFi tooling, indexers, analytics", allocated: 80000, disbursed: 18500, color: "bg-blue-500", icon: "🔗", maxAllocation: 150000 },
-    { id: "public-goods", name: "Public Goods", description: "Open source, commons, public benefit", allocated: 60000, disbursed: 9200, color: "bg-emerald-500", icon: "🌱", maxAllocation: 100000 },
-    { id: "research", name: "Research & Education", description: "Academic research, workshops, documentation", allocated: 30000, disbursed: 4500, color: "bg-purple-500", icon: "🔬", maxAllocation: 50000 },
-    { id: "community", name: "Community & DAOs", description: "Governance tools, community platforms", allocated: 25000, disbursed: 2569.5, color: "bg-amber-500", icon: "👥", maxAllocation: 40000 },
+    { id: "defi", name: "DeFi & Infrastructure", description: "Core DeFi tooling, indexers, analytics, auditing", allocated: 100000, disbursed: 9900, color: "bg-blue-500", icon: "🔗", maxAllocation: 150000 },
+    { id: "public-goods", name: "Public Goods", description: "Open source, commons, climate, public benefit", allocated: 75000, disbursed: 6600, color: "bg-emerald-500", icon: "🌱", maxAllocation: 100000 },
+    { id: "research", name: "Research & Education", description: "Academic research, ZK proofs, documentation", allocated: 40000, disbursed: 1500, color: "bg-purple-500", icon: "🔬", maxAllocation: 50000 },
+    { id: "community", name: "Community & DAOs", description: "Meetups, governance tools, developer onboarding", allocated: 35000, disbursed: 900, color: "bg-amber-500", icon: "👥", maxAllocation: 40000 },
   ];
 }
 
@@ -523,10 +523,20 @@ export function listComments(proposalId: string): ProposalComment[] {
 
 function seedActivity(): ActivityEntry[] {
   return [
-    { id: "act-001", type: "proposal_created", title: "New proposal submitted", description: "Solana Smart Contract Auditing Toolkit — $15,000", proposalId: "prop-001", timestamp: "2026-03-12T00:00:00Z" },
-    { id: "act-002", type: "evaluation_complete", title: "Evaluation complete", description: "Approved with score 82/100", proposalId: "prop-001", timestamp: "2026-03-12T00:05:00Z" },
-    { id: "act-003", type: "disbursement", title: "USDC disbursed", description: "$15,000 transferred to 8nJQk...", proposalId: "prop-001", timestamp: "2026-03-12T00:06:00Z" },
-    { id: "act-004", type: "evaluation_complete", title: "Evaluation complete", description: "Rejected with score 38/100", proposalId: "prop-002", timestamp: "2026-03-13T00:00:00Z" },
+    { id: "act-001", type: "proposal_created", title: "Proposal submitted", description: "Open Source Climate Data Commons — $12,000 by Priya Sharma (rep: 89)", proposalId: "prop-007", timestamp: "2026-03-12T12:00:00Z" },
+    { id: "act-002", type: "evaluation_complete", title: "Approved (89/100)", description: "5 agents verified: GitHub 4800 stars, Twitter 18.6K followers, HN 6800 karma. YC/Gitcoin partner match.", proposalId: "prop-007", timestamp: "2026-03-12T14:00:00Z" },
+    { id: "act-003", type: "disbursement", title: "Tranche 1 disbursed", description: "$3,600 USDC → DPriya4v... (30% of $12,000). Milestones 2-3 pending.", proposalId: "prop-007", timestamp: "2026-03-12T14:01:00Z" },
+    { id: "act-004", type: "proposal_created", title: "Proposal submitted", description: "Solana Smart Contract Auditing Toolkit — $15,000 by Sarah Chen (YC W24)", proposalId: "prop-001", timestamp: "2026-03-14T10:00:00Z" },
+    { id: "act-005", type: "evaluation_complete", title: "Approved (84/100)", description: "Multi-agent: 5/6 platforms verified. Partner: Y Combinator. Council: 4-0 approve.", proposalId: "prop-001", timestamp: "2026-03-14T10:30:00Z" },
+    { id: "act-006", type: "disbursement", title: "Tranche 1 disbursed", description: "$4,500 USDC → 8nJQk7x... (30% of $15,000). Pool: DeFi & Infrastructure.", proposalId: "prop-001", timestamp: "2026-03-14T10:31:00Z" },
+    { id: "act-007", type: "proposal_created", title: "Proposal submitted", description: "Decentralized Social Media Platform — $50,000 by Marcus Webb", proposalId: "prop-002", timestamp: "2026-03-14T10:45:00Z" },
+    { id: "act-008", type: "evaluation_complete", title: "Rejected (34/100)", description: "0/6 platforms verified. No GitHub, no Twitter, no community. Council: 0-4 reject.", proposalId: "prop-002", timestamp: "2026-03-14T11:15:00Z" },
+    { id: "act-009", type: "evaluation_complete", title: "Flagged (78/100)", description: "Cross-Chain Governance Bridge — 4/6 platforms but no YC. Council split 2-2. Human review needed.", proposalId: "prop-003", timestamp: "2026-03-14T12:00:00Z" },
+    { id: "act-010", type: "proposal_created", title: "Sybil detected", description: "\"Definitely Not a Scam Token\" — humanity score 12/100. Rejected pre-screening.", proposalId: "prop-012", timestamp: "2026-03-14T20:00:00Z" },
+    { id: "act-011", type: "evaluation_complete", title: "Approved (76/100)", description: "ZK Proof Research — Elena Kowalski verified on GitHub (920 stars), HN (2100 karma). Pool: Research.", proposalId: "prop-009", timestamp: "2026-03-14T14:00:00Z" },
+    { id: "act-012", type: "disbursement", title: "Tranche 1 disbursed", description: "$1,500 USDC → EKow6Tre... (30% of $5,000). Pool: Research & Education.", proposalId: "prop-009", timestamp: "2026-03-14T14:01:00Z" },
+    { id: "act-013", type: "milestone_verified", title: "Milestone verified", description: "Phase 1: Setup & Foundation — Priya Sharma's Climate Data Commons. Tranche 2 ready.", proposalId: "prop-007", timestamp: "2026-03-15T08:00:00Z" },
+    { id: "act-014", type: "evaluation_complete", title: "Approved (72/100)", description: "Solana Developer Meetups SEA — Dev Singh. 2000+ developers onboarded. Pool: Community.", proposalId: "prop-010", timestamp: "2026-03-15T04:00:00Z" },
   ];
 }
 

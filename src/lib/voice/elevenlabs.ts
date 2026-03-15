@@ -136,3 +136,44 @@ export async function narrateDecision(
     text,
   };
 }
+
+/**
+ * Short narration for agent conversation messages.
+ * Uses a specific voice ID if provided, falls back to default.
+ */
+export async function narrateShort(
+  text: string,
+  voiceId?: string
+): Promise<string | null> {
+  const config = getAppConfig();
+  const vid = voiceId ?? config.elevenLabsVoiceId;
+
+  if (!config.liveElevenLabs || !vid) return null;
+
+  try {
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${vid}`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "audio/mpeg",
+          "Content-Type": "application/json",
+          "xi-api-key": config.elevenLabsApiKey!,
+        },
+        body: JSON.stringify({
+          text: text.slice(0, 300),
+          model_id: "eleven_multilingual_v2",
+        }),
+        signal: AbortSignal.timeout(15_000),
+      }
+    );
+
+    if (response.ok) {
+      const buf = Buffer.from(await response.arrayBuffer());
+      return `data:audio/mpeg;base64,${buf.toString("base64")}`;
+    }
+  } catch {
+    // optional
+  }
+  return null;
+}

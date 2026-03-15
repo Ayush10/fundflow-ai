@@ -17,6 +17,7 @@ import type {
   TreasuryState,
   UnbrowseResearch,
 } from "@/types/api";
+import type { FounderProfile, AgentConversation, ReputationScore } from "@/types/agents";
 
 interface ProposalRecord {
   proposal: Proposal;
@@ -33,6 +34,7 @@ interface FundFlowStore {
   auditRecords: AuditRecord[];
   treasury: TreasuryState;
   listeners: Map<string, Set<(event: AgentEvent) => void>>;
+  founders: Map<string, FounderProfile>;
 }
 
 const STORE_VERSION = "2026-03-14-cx14";
@@ -69,6 +71,7 @@ function createSeedStore(): FundFlowStore {
     auditRecords: structuredClone(mockAuditRecords),
     treasury: structuredClone(mockTreasury),
     listeners: new Map<string, Set<(event: AgentEvent) => void>>(),
+    founders: new Map<string, FounderProfile>(),
   };
 }
 
@@ -243,4 +246,60 @@ export function getTreasuryState(): TreasuryState {
 export function setTreasuryState(treasury: TreasuryState): TreasuryState {
   getStore().treasury = structuredClone(treasury);
   return getTreasuryState();
+}
+
+export const getTreasurySnapshot = getTreasuryState;
+
+// ─── Founder Profiles ─────────────────────────────────────────────
+
+export function getFounder(wallet: string): FounderProfile | null {
+  const profile = getStore().founders.get(wallet);
+  return profile ? structuredClone(profile) : null;
+}
+
+export function listFounders(): FounderProfile[] {
+  return Array.from(getStore().founders.values())
+    .map((f) => structuredClone(f))
+    .sort((a, b) => b.lastSeen.localeCompare(a.lastSeen));
+}
+
+export function upsertFounder(partial: Partial<FounderProfile> & { wallet: string }): FounderProfile {
+  const store = getStore();
+  const existing = store.founders.get(partial.wallet);
+  const now = new Date().toISOString();
+
+  const profile: FounderProfile = {
+    wallet: partial.wallet,
+    name: partial.name ?? existing?.name,
+    bio: partial.bio ?? existing?.bio,
+    platforms: { ...existing?.platforms, ...partial.platforms },
+    reputationScore: partial.reputationScore ?? existing?.reputationScore ?? 0,
+    proposals: existing?.proposals ?? [],
+    firstSeen: existing?.firstSeen ?? now,
+    lastSeen: now,
+    totalFunded: existing?.totalFunded ?? 0,
+    totalRequested: existing?.totalRequested ?? 0,
+  };
+
+  store.founders.set(partial.wallet, profile);
+  return structuredClone(profile);
+}
+
+export function addProposalToFounder(
+  wallet: string,
+  entry: { id: string; title: string; amount: number; decision: string; score: number }
+): FounderProfile | null {
+  const store = getStore();
+  const profile = store.founders.get(wallet);
+  if (!profile) return null;
+
+  profile.proposals.push({ ...entry, date: new Date().toISOString() });
+  profile.totalRequested += entry.amount;
+  if (entry.decision === "approved") {
+    profile.totalFunded += entry.amount;
+  }
+  profile.lastSeen = new Date().toISOString();
+
+  store.founders.set(wallet, profile);
+  return structuredClone(profile);
 }

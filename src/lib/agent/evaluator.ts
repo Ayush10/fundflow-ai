@@ -171,7 +171,13 @@ function buildPrompt(input: {
   proposal: Proposal;
   verification: HumanVerification;
   research: UnbrowseResearch;
+  reputationScore?: number;
+  platformResults?: unknown[];
 }): string {
+  const reputationContext = input.reputationScore != null
+    ? `\nReputation Score: ${input.reputationScore}/100 (from multi-agent due diligence across Twitter, Reddit, Google, Y Combinator, and HackerNews).`
+    : "";
+
   return `You are FundFlow AI, an autonomous on-chain grants allocator.
 
 Evaluate the proposal and return JSON only in this exact shape:
@@ -190,17 +196,22 @@ Evaluate the proposal and return JSON only in this exact shape:
 Rules:
 - Score each field from 0 to 100.
 - Use the human verification and research data for team credibility.
+- Factor in the reputation score from multi-platform due diligence.
+- Approval threshold is 80+. Approved funding is proportional to score.
 - Make overall a weighted summary, not a simple copy of one field.
 - Keep the rationale concise, concrete, and decision-ready.
+${reputationContext}
 
 Context:
-${JSON.stringify(input, null, 2)}`;
+${JSON.stringify({ proposal: input.proposal, verification: input.verification, research: input.research }, null, 2)}`;
 }
 
 export async function evaluateProposal(input: {
   proposal: Proposal;
   verification: HumanVerification;
   research: UnbrowseResearch;
+  reputationScore?: number;
+  platformResults?: unknown[];
 }): Promise<EvaluationResult> {
   const config = getAppConfig();
 

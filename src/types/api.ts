@@ -116,6 +116,28 @@ export type AgentEvent =
       data?: HumanVerification;
     }
   | {
+      step: "multi-agent-research";
+      status: "running" | "complete";
+      data?: unknown;
+    }
+  | {
+      step: "agent-message";
+      status: "message";
+      data?: {
+        agentId: string;
+        agentName: string;
+        emoji: string;
+        text: string;
+        type: string;
+        audioUrl?: string;
+      };
+    }
+  | {
+      step: "reputation-score";
+      status: "complete";
+      data?: unknown;
+    }
+  | {
       step: "unbrowse-research";
       status: "running" | "complete";
       data?: UnbrowseResearch;

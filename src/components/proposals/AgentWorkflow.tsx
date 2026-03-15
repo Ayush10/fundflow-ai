@@ -27,7 +27,17 @@ import type {
 import { subscribeToAgentEvents } from "@/lib/api";
 import { useSounds } from "@/hooks/useSounds";
 import ScoreBar from "@/components/ui/ScoreBar";
+import AgentConversation from "@/components/proposals/AgentConversation";
 import { cn, solanaExplorerUrl } from "@/lib/utils";
+
+interface AgentMsg {
+  agentId: string;
+  agentName: string;
+  emoji: string;
+  text: string;
+  type: string;
+  audioUrl?: string;
+}
 
 interface AgentWorkflowProps {
   proposalId: string;
@@ -38,6 +48,13 @@ interface WorkflowState {
   humanCheck: {
     status: "idle" | "running" | "passed" | "failed";
     data?: HumanVerification;
+  };
+  multiAgentResearch: {
+    status: "idle" | "running" | "complete";
+  };
+  reputationScore: {
+    status: "idle" | "complete";
+    data?: Record<string, unknown>;
   };
   research: {
     status: "idle" | "running" | "complete";
@@ -59,6 +76,8 @@ interface WorkflowState {
 
 const initialState: WorkflowState = {
   humanCheck: { status: "idle" },
+  multiAgentResearch: { status: "idle" },
+  reputationScore: { status: "idle" },
   research: { status: "idle" },
   evaluation: { status: "idle" },
   decision: { status: "idle" },
@@ -71,6 +90,7 @@ export default function AgentWorkflow({
 }: AgentWorkflowProps) {
   const [state, setState] = useState<WorkflowState>(initialState);
   const [isRunning, setIsRunning] = useState(false);
+  const [agentMessages, setAgentMessages] = useState<AgentMsg[]>([]);
   const cancelRef = useRef<(() => void) | null>(null);
   const { play } = useSounds();
 
@@ -86,12 +106,15 @@ export default function AgentWorkflow({
     setIsRunning(true);
     cancelRef.current?.();
 
+    setAgentMessages([]);
+
     const cancel = subscribeToAgentEvents(
       proposalId,
       (event: AgentEvent) => {
         // Play sounds on step completions
         if (event.step === "human-check" && event.status === "passed") play("step-complete");
         if (event.step === "human-check" && event.status === "failed") play("failure");
+        if (event.step === "multi-agent-research" && event.status === "complete") play("step-complete");
         if (event.step === "unbrowse-research" && event.status === "complete") play("step-complete");
         if (event.step === "ai-evaluation" && event.status === "complete") play("step-complete");
         if (event.step === "decision" && event.status === "complete") {
@@ -102,6 +125,11 @@ export default function AgentWorkflow({
         }
         if (event.step === "on-chain" && event.status === "complete") play("success");
 
+        // Collect agent conversation messages
+        if (event.step === "agent-message" && event.data) {
+          setAgentMessages((prev) => [...prev, event.data as AgentMsg]);
+        }
+
         setState((prev) => {
           const next = { ...prev };
           switch (event.step) {
@@ -109,6 +137,17 @@ export default function AgentWorkflow({
               next.humanCheck = {
                 status: event.status as "running" | "passed" | "failed",
                 data: event.data,
+              };
+              break;
+            case "multi-agent-research":
+              next.multiAgentResearch = {
+                status: event.status as "running" | "complete",
+              };
+              break;
+            case "reputation-score":
+              next.reputationScore = {
+                status: "complete",
+                data: event.data as Record<string, unknown>,
               };
               break;
             case "unbrowse-research":
@@ -166,6 +205,54 @@ export default function AgentWorkflow({
       {(isRunning || state.humanCheck.status !== "idle") && (
         <div className="space-y-3">
           <Step1HumanCheck state={state.humanCheck} />
+
+          {/* Multi-Agent Research + Conversation */}
+          <StepWrapper
+            icon={Search}
+            label="Multi-Agent Due Diligence (5 Agents, 6 Platforms)"
+            status={
+              state.multiAgentResearch.status === "idle"
+                ? "idle"
+                : state.multiAgentResearch.status === "complete"
+                ? "complete"
+                : "running"
+            }
+          >
+            {agentMessages.length > 0 && (
+              <AgentConversation messages={agentMessages} />
+            )}
+            {state.reputationScore.data && (
+              <div className="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                <p className="text-xs font-semibold text-gray-400 mb-2">Reputation Score</p>
+                <div className="grid grid-cols-3 gap-2 text-center sm:grid-cols-6">
+                  {[
+                    { label: "Overall", key: "overall" },
+                    { label: "Platforms", key: "platformPresence" },
+                    { label: "Sentiment", key: "sentimentScore" },
+                    { label: "Verified", key: "verificationScore" },
+                    { label: "Community", key: "communityEngagement" },
+                    { label: "Track Record", key: "trackRecord" },
+                  ].map(({ label, key }) => {
+                    const val = Number(state.reputationScore.data?.[key] ?? 0);
+                    return (
+                      <div key={key}>
+                        <p className="text-xs text-gray-500">{label}</p>
+                        <p
+                          className={cn(
+                            "text-lg font-bold",
+                            val >= 70 ? "text-emerald-400" : val >= 40 ? "text-amber-400" : "text-red-400"
+                          )}
+                        >
+                          {val}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </StepWrapper>
+
           <Step2Research state={state.research} />
           <Step3Evaluation state={state.evaluation} />
           <Step4Decision state={state.decision} />

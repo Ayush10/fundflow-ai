@@ -177,16 +177,24 @@ export default function FoundersPage() {
                       )}
                     </div>
 
-                    {/* Wallet */}
-                    <a
-                      href={`https://explorer.solana.com/address/${founder.wallet}?cluster=devnet`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300"
-                    >
-                      {shortenAddress(founder.wallet, 6)}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    {/* Wallet + View Profile */}
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`https://explorer.solana.com/address/${founder.wallet}?cluster=devnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300"
+                      >
+                        {shortenAddress(founder.wallet, 6)}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <Link
+                        href={`/founders/${founder.wallet}`}
+                        className="text-xs text-violet-400 hover:text-violet-300"
+                      >
+                        View Profile →
+                      </Link>
+                    </div>
                   </div>
 
                   {/* Right: Stats */}

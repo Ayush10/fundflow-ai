@@ -1,3 +1,5 @@
+import OpenAI from "openai";
+
 import { getAppConfig } from "@/lib/config";
 import {
   AGENT_SCOUT,
@@ -5,8 +7,8 @@ import {
   AGENT_VERIFIER,
   AGENT_ANALYST,
   AGENT_JUDGE,
-  getAgent,
 } from "@/lib/agent/personas";
+import { checkPartnerDatabase } from "@/lib/agent/partners";
 import {
   researchTwitter,
   researchReddit,
@@ -15,6 +17,7 @@ import {
   researchHackerNews,
   researchGitHub,
 } from "@/lib/integrations/platforms";
+import { getFounder, listFounders } from "@/lib/store";
 import { narrateShort } from "@/lib/voice/elevenlabs";
 import type { Proposal } from "@/types/api";
 import type {
@@ -41,6 +44,77 @@ function now(): string {
 
 type MessageCallback = (msg: AgentMessage) => void;
 
+// ─── GPT-4o Dialogue Generation ─────────────────────────────────────
+
+async function generateAgentDebate(
+  proposal: Proposal,
+  platformResults: PlatformResult[],
+  reputation: ReputationScore,
+  priorHistory: string,
+  partnerInfo: string
+): Promise<string[]> {
+  const config = getAppConfig();
+  if (!config.openaiApiKey) return [];
+
+  try {
+    const openai = new OpenAI({ apiKey: config.openaiApiKey });
+
+    const foundPlatforms = platformResults
+      .filter((r) => r.found)
+      .map((r) => `${r.platform}: ${r.summary}`)
+      .join("\n");
+    const missingPlatforms = platformResults
+      .filter((r) => !r.found)
+      .map((r) => r.platform)
+      .join(", ");
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      temperature: 0.8,
+      max_tokens: 600,
+      messages: [
+        {
+          role: "system",
+          content: `You are a script writer for an AI agent council debating whether to fund a grant proposal. Write a natural 4-6 line debate between these agents. Each line must be formatted as "AGENT_ID: message".
+
+Agents:
+- scout: Social intelligence agent (checks X/Twitter, GitHub). Enthusiastic, uses data.
+- digger: Community researcher (Reddit, HackerNews). Skeptical, wants community proof.
+- verifier: Credential checker (Google, YC). Formal, demands evidence.
+- analyst: Data synthesizer. Objective, summarizes findings.
+
+Rules:
+- Be conversational and natural — agents should react to each other
+- Include specific data points from the research
+- If reputation is low (<40), agents should be critical
+- If reputation is high (>70), agents should be supportive but not blindly
+- Include at least one disagreement or challenge
+- Keep each line under 150 characters
+- Return ONLY the debate lines, nothing else`,
+        },
+        {
+          role: "user",
+          content: `Proposal: "${proposal.title}" — $${proposal.requestedAmount.toLocaleString()}
+Reputation: ${reputation.overall}/100
+
+Found on: ${foundPlatforms || "none"}
+Missing from: ${missingPlatforms || "none"}
+${priorHistory}
+${partnerInfo}`,
+        },
+      ],
+    });
+
+    const text = response.choices[0]?.message?.content ?? "";
+    return text
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.includes(":") && l.length > 5);
+  } catch {
+    return [];
+  }
+}
+
 // ─── Multi-Agent Research ───────────────────────────────────────────
 
 export async function runMultiAgentResearch(
@@ -54,10 +128,14 @@ export async function runMultiAgentResearch(
 }> {
   const source = `${proposal.title} ${proposal.description} ${proposal.transcript ?? ""}`;
   const seed = proposal.id + proposal.title;
+  const config = getAppConfig();
 
-  // Extract identifiers from proposal text
-  const ghUser = extractHandle(source, /github\.com\/([\w-]+)/i) ?? extractHandle(source, /github:\s*@?([\w-]+)/i);
-  const twHandle = extractHandle(source, /(?:x|twitter)\.com\/([\w-]+)/i) ?? extractHandle(source, /(?:@|twitter:\s*@?)([\w-]+)/i);
+  const ghUser =
+    extractHandle(source, /github\.com\/([\w-]+)/i) ??
+    extractHandle(source, /github:\s*@?([\w-]+)/i);
+  const twHandle =
+    extractHandle(source, /(?:x|twitter)\.com\/([\w-]+)/i) ??
+    extractHandle(source, /(?:@|twitter:\s*@?)([\w-]+)/i);
   const searchQuery = proposal.title.replace(/[^\w\s]/g, " ").trim();
   const founderName = extractFounderName(source) ?? searchQuery;
 
@@ -67,23 +145,102 @@ export async function runMultiAgentResearch(
     startedAt: now(),
   };
 
-  function emit(msg: Omit<AgentMessage, "timestamp">) {
+  // Helper to emit + optionally narrate
+  async function emit(
+    msg: Omit<AgentMessage, "timestamp">,
+    narrate = false
+  ) {
     const full: AgentMessage = { ...msg, timestamp: now() };
+
+    if (narrate && config.liveElevenLabs && config.elevenLabsApiKey) {
+      const persona = [AGENT_SCOUT, AGENT_DIGGER, AGENT_VERIFIER, AGENT_ANALYST, AGENT_JUDGE]
+        .find((a) => a.id === msg.agentId);
+      try {
+        const audio = await narrateShort(msg.text, persona?.voiceId);
+        if (audio) full.audioUrl = audio;
+      } catch { /* optional */ }
+    }
+
     conversation.messages.push(full);
     onMessage?.(full);
   }
 
-  // ── Phase 1: Agents introduce themselves and start researching ──
+  // ── Phase 1: Cross-reference previous founder database ──
 
-  emit({
+  const existingFounder = getFounder(proposal.applicantWallet);
+  const allFounders = listFounders();
+  let priorHistory = "";
+
+  if (existingFounder && existingFounder.proposals.length > 0) {
+    const pastApproved = existingFounder.proposals.filter((p) => p.decision === "approved");
+    const pastRejected = existingFounder.proposals.filter((p) => p.decision === "rejected");
+    priorHistory = `Prior history: ${existingFounder.proposals.length} past proposals (${pastApproved.length} approved, ${pastRejected.length} rejected). Previous reputation: ${existingFounder.reputationScore}/100.`;
+
+    await emit(
+      {
+        agentId: AGENT_ANALYST.id,
+        agentName: AGENT_ANALYST.name,
+        emoji: AGENT_ANALYST.emoji,
+        text: `Database check: I've seen this wallet before. ${priorHistory} ${
+          pastRejected.length > 0
+            ? "Previous rejections are a concern."
+            : pastApproved.length > 0
+            ? "Good track record with us."
+            : ""
+        }`,
+        type: "verification",
+      },
+      true // narrate this key finding
+    );
+  } else if (allFounders.length > 0) {
+    await emit({
+      agentId: AGENT_ANALYST.id,
+      agentName: AGENT_ANALYST.name,
+      emoji: AGENT_ANALYST.emoji,
+      text: `Database check: First-time applicant. No prior history in our system (${allFounders.length} founders on record).`,
+      type: "discovery",
+    });
+  }
+
+  // ── Phase 2: Partner database check ──
+
+  const { matches: partnerMatches, totalBoost: partnerBoost } = checkPartnerDatabase(
+    source,
+    proposal.applicantWallet
+  );
+  let partnerInfo = "";
+
+  if (partnerMatches.length > 0) {
+    const names = partnerMatches.map((p) => p.name).join(", ");
+    partnerInfo = `Partner affiliations detected: ${names} (+${partnerBoost} credibility boost).`;
+
+    await emit(
+      {
+        agentId: AGENT_VERIFIER.id,
+        agentName: AGENT_VERIFIER.name,
+        emoji: AGENT_VERIFIER.emoji,
+        text: `Partner database match! Affiliated with ${names}. This adds +${partnerBoost} to credibility. ${
+          partnerMatches.some((p) => p.type === "accelerator")
+            ? "Accelerator backing is a strong signal."
+            : ""
+        }`,
+        type: "verification",
+      },
+      true // narrate partner discovery
+    );
+  }
+
+  // ── Phase 3: Agents introduce and start researching ──
+
+  await emit({
     agentId: AGENT_ANALYST.id,
     agentName: AGENT_ANALYST.name,
     emoji: AGENT_ANALYST.emoji,
-    text: `New proposal incoming: "${proposal.title}" requesting $${proposal.requestedAmount.toLocaleString()}. All agents, begin due diligence.`,
+    text: `New proposal: "${proposal.title}" requesting $${proposal.requestedAmount.toLocaleString()}. All agents, begin due diligence.`,
     type: "discovery",
   });
 
-  emit({
+  await emit({
     agentId: AGENT_SCOUT.id,
     agentName: AGENT_SCOUT.name,
     emoji: AGENT_SCOUT.emoji,
@@ -91,7 +248,7 @@ export async function runMultiAgentResearch(
     type: "discovery",
   });
 
-  emit({
+  await emit({
     agentId: AGENT_DIGGER.id,
     agentName: AGENT_DIGGER.name,
     emoji: AGENT_DIGGER.emoji,
@@ -99,7 +256,7 @@ export async function runMultiAgentResearch(
     type: "discovery",
   });
 
-  emit({
+  await emit({
     agentId: AGENT_VERIFIER.id,
     agentName: AGENT_VERIFIER.name,
     emoji: AGENT_VERIFIER.emoji,
@@ -107,7 +264,7 @@ export async function runMultiAgentResearch(
     type: "discovery",
   });
 
-  // ── Phase 2: Parallel platform research ──
+  // ── Phase 4: Parallel platform research ──
 
   const [twitterResult, githubResult, redditResult, hnResult, googleResult, ycResult] =
     await Promise.all([
@@ -121,51 +278,60 @@ export async function runMultiAgentResearch(
 
   const platformResults = [twitterResult, githubResult, redditResult, hnResult, googleResult, ycResult];
 
-  // ── Phase 3: Agents report discoveries ──
+  // ── Phase 5: Agents report key discoveries (with narration) ──
 
-  // Scout reports
+  // Scout: Twitter & GitHub
   if (twitterResult.found) {
-    emit({
-      agentId: AGENT_SCOUT.id,
-      agentName: AGENT_SCOUT.name,
-      emoji: AGENT_SCOUT.emoji,
-      text: `Found them on X! ${twitterResult.summary}`,
-      type: "discovery",
-    });
+    await emit(
+      {
+        agentId: AGENT_SCOUT.id,
+        agentName: AGENT_SCOUT.name,
+        emoji: AGENT_SCOUT.emoji,
+        text: `Found them on X! ${twitterResult.summary}`,
+        type: "discovery",
+      },
+      true // narrate Scout's discovery
+    );
   } else {
-    emit({
+    await emit({
       agentId: AGENT_SCOUT.id,
       agentName: AGENT_SCOUT.name,
       emoji: AGENT_SCOUT.emoji,
-      text: `Hmm, I couldn't find a strong X/Twitter presence. ${twitterResult.summary}`,
+      text: `No strong X/Twitter presence. ${twitterResult.summary}`,
       type: "discovery",
     });
   }
 
   if (githubResult.found) {
-    emit({
-      agentId: AGENT_SCOUT.id,
-      agentName: AGENT_SCOUT.name,
-      emoji: AGENT_SCOUT.emoji,
-      text: `GitHub looks legit! ${githubResult.summary}`,
-      type: "discovery",
-    });
+    await emit(
+      {
+        agentId: AGENT_SCOUT.id,
+        agentName: AGENT_SCOUT.name,
+        emoji: AGENT_SCOUT.emoji,
+        text: `GitHub looks legit! ${githubResult.summary}`,
+        type: "discovery",
+      },
+      true // narrate GitHub finding
+    );
   }
 
-  // Digger reports
+  // Digger: Reddit & HN
   if (redditResult.found || hnResult.found) {
     const parts: string[] = [];
     if (redditResult.found) parts.push(`Reddit: ${redditResult.summary}`);
     if (hnResult.found) parts.push(`HackerNews: ${hnResult.summary}`);
-    emit({
-      agentId: AGENT_DIGGER.id,
-      agentName: AGENT_DIGGER.name,
-      emoji: AGENT_DIGGER.emoji,
-      text: `Community presence detected! ${parts.join(" | ")}`,
-      type: "discovery",
-    });
+    await emit(
+      {
+        agentId: AGENT_DIGGER.id,
+        agentName: AGENT_DIGGER.name,
+        emoji: AGENT_DIGGER.emoji,
+        text: `Community presence detected! ${parts.join(" | ")}`,
+        type: "discovery",
+      },
+      true // narrate community discovery
+    );
   } else {
-    emit({
+    await emit({
       agentId: AGENT_DIGGER.id,
       agentName: AGENT_DIGGER.name,
       emoji: AGENT_DIGGER.emoji,
@@ -174,212 +340,129 @@ export async function runMultiAgentResearch(
     });
   }
 
-  // Verifier reports
+  // Verifier: Google & YC
   if (ycResult.found) {
-    emit({
-      agentId: AGENT_VERIFIER.id,
-      agentName: AGENT_VERIFIER.name,
-      emoji: AGENT_VERIFIER.emoji,
-      text: `Major credibility signal! ${ycResult.summary} This is a YC-backed founder.`,
-      type: "verification",
-    });
+    await emit(
+      {
+        agentId: AGENT_VERIFIER.id,
+        agentName: AGENT_VERIFIER.name,
+        emoji: AGENT_VERIFIER.emoji,
+        text: `Major credibility signal! ${ycResult.summary} This is a YC-backed founder.`,
+        type: "verification",
+      },
+      true // narrate YC discovery
+    );
   }
 
   if (googleResult.found) {
-    emit({
+    await emit({
       agentId: AGENT_VERIFIER.id,
       agentName: AGENT_VERIFIER.name,
       emoji: AGENT_VERIFIER.emoji,
-      text: `Google results: ${googleResult.summary}`,
+      text: `Google: ${googleResult.summary}`,
       type: "verification",
     });
   } else {
-    emit({
+    await emit({
       agentId: AGENT_VERIFIER.id,
       agentName: AGENT_VERIFIER.name,
       emoji: AGENT_VERIFIER.emoji,
-      text: `Weak Google presence. No significant press or articles found. This is a red flag.`,
+      text: `Weak Google presence. No significant press or articles found.`,
       type: "challenge",
     });
   }
 
-  // ── Phase 4: Cross-verification & debate ──
+  // ── Phase 6: Calculate reputation ──
 
-  const foundCount = platformResults.filter((r) => r.found).length;
-  const totalConfidence = platformResults.reduce((s, r) => s + r.confidence, 0);
-  const avgConfidence = Math.round(totalConfidence / platformResults.length);
+  const reputation = calculateReputation(
+    platformResults,
+    proposal,
+    founderName,
+    partnerBoost,
+    existingFounder
+  );
 
-  if (foundCount >= 4) {
-    emit({
-      agentId: AGENT_ANALYST.id,
-      agentName: AGENT_ANALYST.name,
-      emoji: AGENT_ANALYST.emoji,
-      text: `Strong multi-platform presence: ${foundCount}/6 platforms verified. Average confidence: ${avgConfidence}%. This founder checks out across multiple sources.`,
-      type: "verification",
-    });
-  } else if (foundCount >= 2) {
-    emit({
-      agentId: AGENT_ANALYST.id,
-      agentName: AGENT_ANALYST.name,
-      emoji: AGENT_ANALYST.emoji,
-      text: `Moderate presence: only ${foundCount}/6 platforms verified (confidence: ${avgConfidence}%). Some gaps in the trail.`,
-      type: "challenge",
-    });
-
-    emit({
-      agentId: AGENT_DIGGER.id,
-      agentName: AGENT_DIGGER.name,
-      emoji: AGENT_DIGGER.emoji,
-      text: `I agree that's concerning. Without community validation, we're relying heavily on the proposal itself.`,
-      type: "agreement",
-    });
-  } else {
-    emit({
-      agentId: AGENT_ANALYST.id,
-      agentName: AGENT_ANALYST.name,
-      emoji: AGENT_ANALYST.emoji,
-      text: `Warning: only ${foundCount}/6 platforms showed any presence. Confidence is just ${avgConfidence}%. This could be a new or unverifiable applicant.`,
-      type: "challenge",
-    });
-
-    emit({
-      agentId: AGENT_SCOUT.id,
-      agentName: AGENT_SCOUT.name,
-      emoji: AGENT_SCOUT.emoji,
-      text: `Could be a brand new builder — or a Sybil. No track record makes it impossible to assess credibility from web data alone.`,
-      type: "challenge",
-    });
-  }
-
-  // Budget check
-  if (proposal.requestedAmount > 25000) {
-    emit({
-      agentId: AGENT_VERIFIER.id,
-      agentName: AGENT_VERIFIER.name,
-      emoji: AGENT_VERIFIER.emoji,
-      text: `$${proposal.requestedAmount.toLocaleString()} is a large ask. For this amount I'd want to see at least 4/6 platforms verified and strong community backing.`,
-      type: "challenge",
-    });
-  }
-
-  // ── Phase 5: Calculate reputation score ──
-
-  const reputation = calculateReputation(platformResults, proposal, founderName);
-
-  emit({
+  await emit({
     agentId: AGENT_ANALYST.id,
     agentName: AGENT_ANALYST.name,
     emoji: AGENT_ANALYST.emoji,
-    text: `Reputation score calculated: ${reputation.overall}/100. Platform presence: ${reputation.platformPresence}, Sentiment: ${reputation.sentimentScore}, Community: ${reputation.communityEngagement}, Track record: ${reputation.trackRecord}.`,
+    text: `Reputation score: ${reputation.overall}/100 (platforms: ${reputation.platformPresence}, sentiment: ${reputation.sentimentScore}, community: ${reputation.communityEngagement}, track record: ${reputation.trackRecord}).`,
     type: "verification",
   });
 
-  // ── Phase 6: Agents argue and reach verdict ──
+  // ── Phase 7: GPT-4o generated debate ──
 
-  if (reputation.overall >= 80) {
-    emit({
-      agentId: AGENT_SCOUT.id,
-      agentName: AGENT_SCOUT.name,
-      emoji: AGENT_SCOUT.emoji,
-      text: `I'm convinced. Strong digital footprint across platforms. This is a real builder.`,
-      type: "agreement",
-    });
-    emit({
-      agentId: AGENT_DIGGER.id,
-      agentName: AGENT_DIGGER.name,
-      emoji: AGENT_DIGGER.emoji,
-      text: `The community signals support it. I vote approve.`,
-      type: "agreement",
-    });
-    emit({
-      agentId: AGENT_VERIFIER.id,
-      agentName: AGENT_VERIFIER.name,
-      emoji: AGENT_VERIFIER.emoji,
-      text: `Credentials check out. I'm in favor.`,
-      type: "agreement",
-    });
-  } else if (reputation.overall >= 50) {
-    emit({
-      agentId: AGENT_SCOUT.id,
-      agentName: AGENT_SCOUT.name,
-      emoji: AGENT_SCOUT.emoji,
-      text: `Mixed signals. I see some presence but not enough for full confidence.`,
-      type: "challenge",
-    });
-    emit({
-      agentId: AGENT_DIGGER.id,
-      agentName: AGENT_DIGGER.name,
-      emoji: AGENT_DIGGER.emoji,
-      text: `The community evidence is thin. I'd want more before committing significant funds.`,
-      type: "challenge",
-    });
-    emit({
-      agentId: AGENT_VERIFIER.id,
-      agentName: AGENT_VERIFIER.name,
-      emoji: AGENT_VERIFIER.emoji,
-      text: `I can partially verify their identity. Perhaps reduced funding with milestone gates?`,
-      type: "agreement",
-    });
-  } else {
-    emit({
-      agentId: AGENT_SCOUT.id,
-      agentName: AGENT_SCOUT.name,
-      emoji: AGENT_SCOUT.emoji,
-      text: `I couldn't verify this person anywhere. Too risky.`,
-      type: "challenge",
-    });
-    emit({
-      agentId: AGENT_DIGGER.id,
-      agentName: AGENT_DIGGER.name,
-      emoji: AGENT_DIGGER.emoji,
-      text: `Zero community footprint. I vote reject.`,
-      type: "challenge",
-    });
-    emit({
-      agentId: AGENT_VERIFIER.id,
-      agentName: AGENT_VERIFIER.name,
-      emoji: AGENT_VERIFIER.emoji,
-      text: `No verifiable credentials. This doesn't meet our due diligence standards.`,
-      type: "challenge",
+  const debateLines = await generateAgentDebate(
+    proposal,
+    platformResults,
+    reputation,
+    priorHistory,
+    partnerInfo
+  );
+
+  const agentMap: Record<string, typeof AGENT_SCOUT> = {
+    scout: AGENT_SCOUT,
+    digger: AGENT_DIGGER,
+    verifier: AGENT_VERIFIER,
+    analyst: AGENT_ANALYST,
+    judge: AGENT_JUDGE,
+  };
+
+  for (const line of debateLines) {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx < 0) continue;
+    const agentId = line.slice(0, colonIdx).trim().toLowerCase();
+    const text = line.slice(colonIdx + 1).trim();
+    const agent = agentMap[agentId];
+    if (!agent || !text) continue;
+
+    const isChallenge = text.toLowerCase().includes("concern") ||
+      text.toLowerCase().includes("risk") ||
+      text.toLowerCase().includes("disagree") ||
+      text.toLowerCase().includes("but ");
+    const isAgreement = text.toLowerCase().includes("agree") ||
+      text.toLowerCase().includes("support") ||
+      text.toLowerCase().includes("convinced");
+
+    await emit({
+      agentId: agent.id,
+      agentName: agent.name,
+      emoji: agent.emoji,
+      text,
+      type: isChallenge ? "challenge" : isAgreement ? "agreement" : "discovery",
     });
   }
 
-  // Judge renders verdict
+  // ── Phase 8: Judge verdict ──
+
+  const foundCount = platformResults.filter((r) => r.found).length;
   const approveVotes = reputation.overall >= 50 ? (reputation.overall >= 80 ? 4 : 2) : 0;
   const rejectVotes = 4 - approveVotes;
   const verdictPct = Math.round((approveVotes / 4) * 100);
 
-  emit({
-    agentId: AGENT_JUDGE.id,
-    agentName: AGENT_JUDGE.name,
-    emoji: AGENT_JUDGE.emoji,
-    text: `The council has voted: ${approveVotes} in favor, ${rejectVotes} against (${verdictPct}% approval). Reputation score: ${reputation.overall}/100. ${
-      reputation.overall >= 80
-        ? "Proceeding to AI evaluation with strong backing."
-        : reputation.overall >= 50
-        ? "Proceeding to AI evaluation with reservations. Recommend reduced funding."
-        : "Insufficient evidence for approval. Forwarding to AI for final assessment."
-    }`,
-    type: "verdict",
-  });
-
-  // Narrate the verdict via ElevenLabs
-  const config = getAppConfig();
-  if (config.liveElevenLabs && config.elevenLabsApiKey) {
-    try {
-      const verdictText = conversation.messages[conversation.messages.length - 1].text;
-      const audio = await narrateShort(verdictText, AGENT_JUDGE.voiceId);
-      if (audio) {
-        conversation.messages[conversation.messages.length - 1].audioUrl = audio;
-      }
-    } catch {
-      // narration optional
-    }
-  }
+  await emit(
+    {
+      agentId: AGENT_JUDGE.id,
+      agentName: AGENT_JUDGE.name,
+      emoji: AGENT_JUDGE.emoji,
+      text: `The council votes: ${approveVotes} approve, ${rejectVotes} reject (${verdictPct}%). Reputation: ${reputation.overall}/100. Platforms verified: ${foundCount}/6.${
+        partnerMatches.length > 0 ? ` Partner affiliations: ${partnerMatches.map((p) => p.name).join(", ")}.` : ""
+      }${
+        existingFounder ? ` Prior history: ${existingFounder.proposals.length} proposals.` : ""
+      } ${
+        reputation.overall >= 80
+          ? "Strong backing — proceeding to AI evaluation."
+          : reputation.overall >= 50
+          ? "Moderate confidence — recommend reduced funding."
+          : "Insufficient evidence — forwarding for final AI assessment."
+      }`,
+      type: "verdict",
+    },
+    true // narrate the verdict
+  );
 
   conversation.completedAt = now();
 
-  // Build partial founder profile
   const founderProfile = buildFounderProfile(
     proposal,
     platformResults,
@@ -392,32 +475,30 @@ export async function runMultiAgentResearch(
   return { platformResults, conversation, reputation, founderProfile };
 }
 
-// ─── Reputation Scoring ─────────────────────────────────────────────
+// ─── Reputation Scoring (enhanced with partner & history) ───────────
 
 function calculateReputation(
   results: PlatformResult[],
   proposal: Proposal,
-  founderName: string
+  founderName: string,
+  partnerBoost: number,
+  existingFounder: FounderProfile | null
 ): ReputationScore {
   const found = results.filter((r) => r.found);
   const totalPlatforms = results.length;
 
-  // Platform presence: how many platforms found (0-100)
   const platformPresence = Math.round((found.length / totalPlatforms) * 100);
 
-  // Sentiment: average sentiment across found platforms
-  const sentimentMap = { positive: 90, neutral: 50, negative: 20, not_found: 10 };
+  const sentimentMap: Record<string, number> = { positive: 90, neutral: 50, negative: 20, not_found: 10 };
   const sentimentScore = Math.round(
-    results.reduce((s, r) => s + sentimentMap[r.sentiment], 0) / totalPlatforms
+    results.reduce((s, r) => s + (sentimentMap[r.sentiment] ?? 10), 0) / totalPlatforms
   );
 
-  // Verification: weighted confidence
   const verificationScore = Math.round(
     results.reduce((s, r) => s + r.confidence * (r.found ? 1.5 : 0.5), 0) /
       (totalPlatforms * 1.5)
   );
 
-  // Community engagement: Reddit + HN combined
   const reddit = results.find((r) => r.platform === "reddit");
   const hn = results.find((r) => r.platform === "hackernews");
   const communityEngagement = clamp(
@@ -428,11 +509,10 @@ function calculateReputation(
     100
   );
 
-  // Track record: GitHub + YC + Google
   const gh = results.find((r) => r.platform === "github");
   const yc = results.find((r) => r.platform === "ycombinator");
   const google = results.find((r) => r.platform === "google");
-  const trackRecord = clamp(
+  let trackRecord = clamp(
     Math.round(
       ((gh?.found ? gh.confidence * 1.2 : 10) +
         (yc?.found ? 95 : 5) +
@@ -443,7 +523,16 @@ function calculateReputation(
     100
   );
 
-  // Overall: weighted average
+  // Boost from partner database
+  trackRecord = clamp(trackRecord + partnerBoost, 0, 100);
+
+  // Boost/penalty from prior history
+  if (existingFounder) {
+    const pastApproved = existingFounder.proposals.filter((p) => p.decision === "approved").length;
+    const pastRejected = existingFounder.proposals.filter((p) => p.decision === "rejected").length;
+    trackRecord = clamp(trackRecord + pastApproved * 8 - pastRejected * 12, 0, 100);
+  }
+
   const overall = clamp(
     Math.round(
       platformPresence * 0.2 +
@@ -538,7 +627,6 @@ function buildFounderProfile(
 }
 
 function extractFounderName(text: string): string | undefined {
-  // Try to find a name pattern like "by John Smith" or "founder: Jane Doe"
   const patterns = [
     /(?:founder|author|by|built by|created by)[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/i,
     /(?:I'm|I am|my name is)\s+([A-Z][a-z]+ [A-Z][a-z]+)/i,

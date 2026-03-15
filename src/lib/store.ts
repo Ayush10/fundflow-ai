@@ -18,6 +18,7 @@ import type {
   UnbrowseResearch,
 } from "@/types/api";
 import type { FounderProfile, AgentConversation, ReputationScore } from "@/types/agents";
+import type { TreasuryTransaction, FundPool } from "@/types/treasury";
 
 interface ProposalRecord {
   proposal: Proposal;
@@ -35,6 +36,8 @@ interface FundFlowStore {
   treasury: TreasuryState;
   listeners: Map<string, Set<(event: AgentEvent) => void>>;
   founders: Map<string, FounderProfile>;
+  transactions: TreasuryTransaction[];
+  fundPools: FundPool[];
 }
 
 const STORE_VERSION = "2026-03-14-cx14";
@@ -72,6 +75,8 @@ function createSeedStore(): FundFlowStore {
     treasury: structuredClone(mockTreasury),
     listeners: new Map<string, Set<(event: AgentEvent) => void>>(),
     founders: new Map<string, FounderProfile>(),
+    transactions: seedTransactions(),
+    fundPools: seedFundPools(),
   };
 }
 
@@ -283,6 +288,59 @@ export function upsertFounder(partial: Partial<FounderProfile> & { wallet: strin
 
   store.founders.set(partial.wallet, profile);
   return structuredClone(profile);
+}
+
+// ─── Transaction Ledger & Fund Pools ──────────────────────────────
+
+function seedFundPools(): FundPool[] {
+  return [
+    { id: "defi", name: "DeFi & Infrastructure", description: "Core DeFi tooling, indexers, analytics", allocated: 80000, disbursed: 18500, color: "bg-blue-500", icon: "🔗", maxAllocation: 150000 },
+    { id: "public-goods", name: "Public Goods", description: "Open source, commons, public benefit", allocated: 60000, disbursed: 9200, color: "bg-emerald-500", icon: "🌱", maxAllocation: 100000 },
+    { id: "research", name: "Research & Education", description: "Academic research, workshops, documentation", allocated: 30000, disbursed: 4500, color: "bg-purple-500", icon: "🔬", maxAllocation: 50000 },
+    { id: "community", name: "Community & DAOs", description: "Governance tools, community platforms", allocated: 25000, disbursed: 2569.5, color: "bg-amber-500", icon: "👥", maxAllocation: 40000 },
+  ];
+}
+
+function seedTransactions(): TreasuryTransaction[] {
+  const base = new Date("2026-03-10T00:00:00Z");
+  return [
+    { id: "tx-001", type: "incoming", amount: 200000, description: "Initial treasury funding from Solana Foundation grant", timestamp: new Date(base.getTime()).toISOString() },
+    { id: "tx-002", type: "deposit", amount: 120000, description: "Deposit to Meteora yield vault (62/38 split)", pool: "defi", timestamp: new Date(base.getTime() + 3600000).toISOString() },
+    { id: "tx-003", type: "yield", amount: 847.32, description: "Meteora vault yield accrual (0.045% APY)", timestamp: new Date(base.getTime() + 86400000).toISOString() },
+    { id: "tx-004", type: "disbursement", amount: 15000, description: "Approved: Solana Smart Contract Auditing Toolkit", counterparty: "8nJQk...", proposalId: "prop-001", pool: "defi", timestamp: new Date(base.getTime() + 172800000).toISOString() },
+    { id: "tx-005", type: "rebalance", amount: 5000, description: "Auto-rebalance: vault → liquid (maintain 62/38)", timestamp: new Date(base.getTime() + 180000000).toISOString() },
+    { id: "tx-006", type: "yield", amount: 500, description: "Meteora vault yield accrual", timestamp: new Date(base.getTime() + 259200000).toISOString() },
+    { id: "tx-007", type: "yield", amount: 500, description: "Meteora vault yield accrual", timestamp: new Date(base.getTime() + 345600000).toISOString() },
+    { id: "tx-008", type: "disbursement", amount: 3000, description: "Approved: Open Source Climate Data Dashboard", counterparty: "Dn1SD...", proposalId: "prop-eval-1", pool: "public-goods", timestamp: new Date(base.getTime() + 400000000).toISOString() },
+  ];
+}
+
+export function listTransactions(): TreasuryTransaction[] {
+  return structuredClone(getStore().transactions).sort((a, b) =>
+    b.timestamp.localeCompare(a.timestamp)
+  );
+}
+
+export function addTransaction(tx: Omit<TreasuryTransaction, "id" | "timestamp">): TreasuryTransaction {
+  const full: TreasuryTransaction = {
+    ...tx,
+    id: createId("tx"),
+    timestamp: new Date().toISOString(),
+  };
+  getStore().transactions.unshift(full);
+  return structuredClone(full);
+}
+
+export function listFundPools(): FundPool[] {
+  return structuredClone(getStore().fundPools);
+}
+
+export function updateFundPool(poolId: string, update: Partial<FundPool>): FundPool | null {
+  const store = getStore();
+  const pool = store.fundPools.find((p) => p.id === poolId);
+  if (!pool) return null;
+  Object.assign(pool, update);
+  return structuredClone(pool);
 }
 
 export function addProposalToFounder(

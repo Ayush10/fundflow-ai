@@ -1,5 +1,6 @@
 import {
   addProposalToFounder,
+  addTransaction,
   appendAgentEvent,
   getProposal,
   requireProposalRecord,
@@ -223,6 +224,17 @@ async function executeEvaluation(proposalId: string): Promise<Proposal> {
     const disbursalProposal = { ...record.proposal, requestedAmount: approvedAmount };
     const disbursement = await disburseApprovedProposal(disbursalProposal);
     decision = { ...decision, disbursementTxHash: disbursement.txHash };
+
+    // Log to transaction ledger
+    addTransaction({
+      type: "disbursement",
+      amount: approvedAmount,
+      description: `Approved: ${record.proposal.title} (${overallScore}% score, ${Math.round(fundingRatio * 100)}% of requested)`,
+      counterparty: record.proposal.applicantWallet.slice(0, 8) + "...",
+      proposalId,
+      txHash: disbursement.txHash,
+      pool: approvedAmount > 10000 ? "defi" : "public-goods",
+    });
   }
 
   appendAgentEvent(proposalId, { step: "on-chain", status: "rebalancing" });

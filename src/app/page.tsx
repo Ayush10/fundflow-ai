@@ -17,7 +17,8 @@ import StatCard from "@/components/ui/StatCard";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Card, { CardHeader, CardTitle } from "@/components/ui/Card";
 import { PageLoader } from "@/components/ui/LoadingSpinner";
-import { formatUSDC, formatDate, shortenAddress, getScoreColor } from "@/lib/utils";
+import OnChainStatus from "@/components/ui/OnChainStatus";
+import { formatUSDC, formatDate, shortenAddress, getScoreColor, solanaExplorerUrl } from "@/lib/utils";
 
 export default function DashboardPage() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -135,6 +136,9 @@ export default function DashboardPage() {
         />
       </motion.div>
 
+      {/* On-Chain Status */}
+      <OnChainStatus />
+
       {/* Two column: Recent proposals + Audit trail */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent Proposals */}
@@ -194,9 +198,12 @@ export default function DashboardPage() {
             </CardHeader>
             <div className="space-y-3">
               {auditRecords.slice(0, 4).map((record) => (
-                <div
+                <a
                   key={record.id}
-                  className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3"
+                  href={solanaExplorerUrl(record.txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3 transition-colors hover:bg-white/5"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-white">
@@ -204,7 +211,8 @@ export default function DashboardPage() {
                     </p>
                     <p className="mt-0.5 text-xs text-gray-500">
                       {formatDate(record.timestamp)} &middot;{" "}
-                      {shortenAddress(record.applicantWallet)}
+                      {shortenAddress(record.applicantWallet)} &middot;{" "}
+                      <span className="text-cyan-500">View on Explorer</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -217,7 +225,7 @@ export default function DashboardPage() {
                     </span>
                     <StatusBadge status={record.decision} />
                   </div>
-                </div>
+                </a>
               ))}
             </div>
           </Card>
@@ -232,14 +240,15 @@ export default function DashboardPage() {
         className="flex flex-wrap items-center justify-center gap-3 pt-4"
       >
         {[
-          "Solana",
+          "Solana Devnet",
           "Metaplex Core",
+          "Agent Registry",
           "Meteora",
-          "LangChain",
-          "Claude AI",
+          "GPT-4o",
           "human.tech",
           "Unbrowse",
           "ElevenLabs",
+          "SPL Token (USDC)",
         ].map((tech) => (
           <span
             key={tech}

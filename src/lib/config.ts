@@ -73,8 +73,7 @@ export function getAppConfig(): AppConfig {
       toBoolean(process.env.ENABLE_REAL_HUMAN_TECH) &&
       Boolean(humanTechApiKey) &&
       Boolean(process.env.HUMAN_TECH_SCORER_ID),
-    liveUnbrowse:
-      toBoolean(process.env.ENABLE_REAL_UNBROWSE) && Boolean(unbrowseApiKey),
+    liveUnbrowse: toBoolean(process.env.ENABLE_REAL_UNBROWSE),
     liveElevenLabs:
       toBoolean(process.env.ENABLE_REAL_ELEVENLABS) &&
       Boolean(elevenLabsApiKey),

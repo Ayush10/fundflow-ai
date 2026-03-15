@@ -38,17 +38,29 @@ export interface UnbrowseResearch {
     stars: number;
     commitFrequency: "high" | "medium" | "low";
     topLanguages: string[];
+    profileUrl?: string;
+    bio?: string;
+    contributions?: number;
   } | null;
   linkedin: {
     headline: string;
     employment: string;
     connectionCount: number;
+    profileUrl?: string;
+    skills?: string[];
   } | null;
   twitter: {
     handle: string;
     followers: number;
     engagement: "high" | "medium" | "low";
+    profileUrl?: string;
+    recentTopics?: string[];
   } | null;
+  dataSources?: {
+    github: "unbrowse" | "fallback";
+    linkedin: "unbrowse" | "fallback";
+    twitter: "unbrowse" | "fallback";
+  };
   completedAt: string;
 }
 

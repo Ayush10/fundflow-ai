@@ -22,16 +22,44 @@ async function unbrowseResolve(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ intent, url }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (res.ok) {
       return (await res.json()) as Record<string, unknown>;
     }
   } catch {
-    // Unbrowse server not running
+    // Unbrowse server not running or timed out
   }
   return null;
 }
 
+function toStringArray(val: unknown): string[] {
+  if (Array.isArray(val)) return val.map(String).slice(0, 5);
+  if (typeof val === "string") return val.split(",").map((s) => s.trim()).filter(Boolean);
+  return [];
+}
+
+function classifyFrequency(val: unknown, highThresh = 20, medThresh = 5): "high" | "medium" | "low" {
+  const n = Number(val ?? 0);
+  if (n > highThresh) return "high";
+  if (n > medThresh) return "medium";
+  return "low";
+}
+
+/**
+ * Autonomous Due Diligence via Unbrowse
+ *
+ * Uses Unbrowse to reverse-engineer GitHub, LinkedIn, and Twitter/X APIs
+ * to build structured applicant profiles. Each platform is scraped
+ * independently with targeted extraction intents, then the results are
+ * normalized into a unified research profile that feeds directly into
+ * the AI scoring pipeline.
+ *
+ * This is a novel use case: Unbrowse acts as an autonomous web research
+ * agent performing structured data extraction for on-chain grant due
+ * diligence — replacing manual background checks with real-time,
+ * verifiable credential analysis.
+ */
 export async function runUnbrowseResearch(
   proposal: Proposal
 ): Promise<UnbrowseResearch> {
@@ -41,65 +69,91 @@ export async function runUnbrowseResearch(
   // Try real Unbrowse CLI (local server on port 6969)
   if (config.liveUnbrowse) {
     try {
-      // Extract any GitHub username from the proposal text
+      // Extract profile handles from proposal text
       const ghUser =
         extractProfile(source, /github\.com\/([\w-]+)/i) ?? "solana-labs";
+      const twitterUser =
+        extractProfile(source, /(?:x|twitter)\.com\/([\w-]+)/i) ?? ghUser;
+      const linkedinSlug =
+        extractProfile(source, /linkedin\.com\/in\/([\w-]+)/i);
 
-      const [githubData, twitterData] = await Promise.all([
+      // Run all three platform scrapes concurrently
+      const [githubData, linkedinData, twitterData] = await Promise.all([
         unbrowseResolve(
-          "get user profile, repository count, total stars, top programming languages, and recent commit activity",
+          "Extract the user's bio, public repository count, total stars across all repos, " +
+            "top 5 programming languages by usage, number of contributions in the last year, " +
+            "and any pinned repository names. Return as structured JSON.",
           `https://github.com/${ghUser}`
         ),
+        linkedinSlug
+          ? unbrowseResolve(
+              "Extract the person's headline, current employment or company, " +
+                "number of connections (or '500+'), and list of top skills. " +
+                "Return as structured JSON.",
+              `https://linkedin.com/in/${linkedinSlug}`
+            )
+          : Promise.resolve(null),
         unbrowseResolve(
-          "get user profile, follower count, and recent engagement metrics",
-          `https://x.com/${extractProfile(source, /(?:x|twitter)\.com\/([\w-]+)/i) ?? ghUser}`
+          "Extract the user's display name, follower count, following count, " +
+            "engagement metrics, bio text, and topics of their 3 most recent posts. " +
+            "Return as structured JSON.",
+          `https://x.com/${twitterUser}`
         ),
       ]);
 
-      if (githubData || twitterData) {
-        const ghResult = githubData?.data as Record<string, unknown> | undefined;
-        const twResult = twitterData?.data as Record<string, unknown> | undefined;
+      const ghResult = (githubData?.data ?? githubData) as Record<string, unknown> | undefined;
+      const liResult = (linkedinData?.data ?? linkedinData) as Record<string, unknown> | undefined;
+      const twResult = (twitterData?.data ?? twitterData) as Record<string, unknown> | undefined;
 
+      // Build research from whatever Unbrowse could extract
+      if (ghResult || liResult || twResult) {
         return {
           proposalId: proposal.id,
           github: ghResult
             ? {
                 username: String(ghResult.username ?? ghResult.login ?? ghUser),
-                repos: Number(ghResult.repos ?? ghResult.public_repos ?? 0),
-                stars: Number(
-                  ghResult.stars ?? ghResult.total_stars ?? ghResult.followers ?? 0
+                repos: Number(ghResult.repos ?? ghResult.public_repos ?? ghResult.repository_count ?? 0),
+                stars: Number(ghResult.stars ?? ghResult.total_stars ?? 0),
+                commitFrequency: classifyFrequency(
+                  ghResult.contributions ?? ghResult.recent_commits ?? 10
                 ),
-                commitFrequency:
-                  Number(ghResult.recent_commits ?? 10) > 20
-                    ? "high"
-                    : Number(ghResult.recent_commits ?? 10) > 5
-                    ? "medium"
-                    : "low",
-                topLanguages: Array.isArray(ghResult.languages)
-                  ? (ghResult.languages as string[]).slice(0, 3)
+                topLanguages: toStringArray(ghResult.languages ?? ghResult.top_languages).length > 0
+                  ? toStringArray(ghResult.languages ?? ghResult.top_languages)
                   : inferLanguagesFromText(source),
+                profileUrl: `https://github.com/${ghUser}`,
+                bio: typeof ghResult.bio === "string" ? ghResult.bio.slice(0, 200) : undefined,
+                contributions: Number(ghResult.contributions ?? ghResult.contribution_count ?? 0) || undefined,
               }
             : null,
-          linkedin: {
-            headline:
-              "Independent founder building mission-aligned infrastructure",
-            employment: "Open-source founder",
-            connectionCount: stableNumberFromText(source, 120, 1400),
-          },
+          linkedin: liResult
+            ? {
+                headline: String(liResult.headline ?? "Independent builder"),
+                employment: String(liResult.employment ?? liResult.company ?? liResult.current_position ?? "Open-source founder"),
+                connectionCount: Number(String(liResult.connections ?? liResult.connectionCount ?? "500").replace("+", "")) || 500,
+                profileUrl: linkedinSlug ? `https://linkedin.com/in/${linkedinSlug}` : undefined,
+                skills: toStringArray(liResult.skills ?? liResult.top_skills),
+              }
+            : {
+                headline: "Independent founder building mission-aligned infrastructure",
+                employment: "Open-source founder",
+                connectionCount: stableNumberFromText(source, 120, 1400),
+              },
           twitter: twResult
             ? {
-                handle: String(
-                  twResult.handle ?? twResult.username ?? `@${ghUser}`
-                ),
+                handle: String(twResult.handle ?? twResult.username ?? `@${twitterUser}`),
                 followers: Number(twResult.followers ?? twResult.follower_count ?? 0),
-                engagement:
-                  Number(twResult.engagement_rate ?? 0) > 3
-                    ? "high"
-                    : Number(twResult.engagement_rate ?? 0) > 1
-                    ? "medium"
-                    : "low",
+                engagement: classifyFrequency(
+                  twResult.engagement_rate ?? twResult.engagement ?? 0, 3, 1
+                ),
+                profileUrl: `https://x.com/${twitterUser}`,
+                recentTopics: toStringArray(twResult.recent_topics ?? twResult.topics),
               }
             : null,
+          dataSources: {
+            github: ghResult ? "unbrowse" : "fallback",
+            linkedin: liResult ? "unbrowse" : "fallback",
+            twitter: twResult ? "unbrowse" : "fallback",
+          },
           completedAt: new Date().toISOString(),
         };
       }
@@ -128,6 +182,7 @@ export async function runUnbrowseResearch(
       stars: stableNumberFromText(source, 45, 950),
       commitFrequency: stablePick(source, ["high", "medium", "low"]),
       topLanguages: inferLanguagesFromText(source),
+      profileUrl: `https://github.com/${githubUsername}`,
     },
     linkedin: {
       headline: linkedinSlug
@@ -146,6 +201,12 @@ export async function runUnbrowseResearch(
         "medium",
         "low",
       ]),
+      profileUrl: `https://x.com/${twitterHandle}`,
+    },
+    dataSources: {
+      github: "fallback",
+      linkedin: "fallback",
+      twitter: "fallback",
     },
     completedAt: new Date().toISOString(),
   };

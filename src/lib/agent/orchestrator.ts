@@ -7,7 +7,7 @@ import {
   createApprovalRequest,
   createMilestones,
   getProposal,
-  requireMultiSig,
+  requiresMultiSig,
   requireProposalRecord,
   setProposalDecision,
   setProposalResearch,
@@ -285,7 +285,7 @@ async function executeEvaluation(proposalId: string): Promise<Proposal> {
   );
 
   // Multi-sig check for large remaining tranches
-  if (decisionType === "approved" && requireMultiSig(approvedAmount)) {
+  if (decisionType === "approved" && requiresMultiSig(approvedAmount)) {
     createApprovalRequest(proposalId, record.proposal.title, approvedAmount);
   }
 

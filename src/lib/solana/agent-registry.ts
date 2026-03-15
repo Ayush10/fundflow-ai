@@ -70,13 +70,12 @@ export async function registerFundFlowAgent(): Promise<{
       collection.publicKey.toString()
     );
 
-    // 2. Create the agent identity asset within the collection
+    // 2. Create the agent identity asset (standalone — collection link done via registry)
     const agentAsset = generateSigner(umi);
     await create(umi, {
       asset: agentAsset,
       name: AGENT_NAME,
       uri: AGENT_URI,
-      collection: collection.publicKey,
     }).sendAndConfirm(umi);
 
     console.log(

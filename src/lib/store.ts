@@ -18,7 +18,7 @@ import type {
   UnbrowseResearch,
 } from "@/types/api";
 import type { FounderProfile, AgentConversation, ReputationScore } from "@/types/agents";
-import type { TreasuryTransaction, FundPool } from "@/types/treasury";
+import type { TreasuryTransaction, FundPool, Milestone } from "@/types/treasury";
 import * as persist from "@/lib/persist";
 
 interface ProposalRecord {
@@ -39,6 +39,7 @@ interface FundFlowStore {
   founders: Map<string, FounderProfile>;
   transactions: TreasuryTransaction[];
   fundPools: FundPool[];
+  milestones: Milestone[];
 }
 
 const STORE_VERSION = "2026-03-14-cx14";
@@ -78,6 +79,7 @@ function createSeedStore(): FundFlowStore {
     founders: new Map<string, FounderProfile>(),
     transactions: seedTransactions(),
     fundPools: seedFundPools(),
+    milestones: [],
   };
 }
 
@@ -401,4 +403,59 @@ export function addProposalToFounder(
   persist.persistFounder(profile);
   persist.persistFounderProposal(wallet, { ...entry, date });
   return structuredClone(profile);
+}
+
+// ─── Milestones ───────────────────────────────────────────────────
+
+export function createMilestones(proposalId: string, totalAmount: number): Milestone[] {
+  const tranches = [
+    { pct: 30, title: "Phase 1: Setup & Foundation" },
+    { pct: 30, title: "Phase 2: Core Development" },
+    { pct: 40, title: "Phase 3: Launch & Delivery" },
+  ];
+
+  const milestones: Milestone[] = tranches.map((t, i) => ({
+    id: createId("ms"),
+    proposalId,
+    title: t.title,
+    tranchePct: t.pct,
+    trancheAmount: Math.round(totalAmount * (t.pct / 100) * 100) / 100,
+    status: i === 0 ? "disbursed" : "pending", // first tranche auto-disbursed
+  }));
+
+  const store = getStore();
+  store.milestones.push(...milestones);
+  return structuredClone(milestones);
+}
+
+export function listMilestones(proposalId?: string): Milestone[] {
+  const store = getStore();
+  const all = proposalId
+    ? store.milestones.filter((m) => m.proposalId === proposalId)
+    : store.milestones;
+  return structuredClone(all);
+}
+
+// ─── Auto-Categorize ─────────────────────────────────────────────
+
+export function categorizeProposal(title: string, description: string): string {
+  const text = `${title} ${description}`.toLowerCase();
+  const defiKw = ["defi", "swap", "amm", "liquidity", "yield", "vault", "protocol", "indexer", "oracle", "bridge", "analytics"];
+  const publicKw = ["public good", "open source", "commons", "climate", "education", "accessibility", "free"];
+  const researchKw = ["research", "paper", "academic", "study", "experiment", "documentation", "workshop"];
+  const communityKw = ["community", "dao", "governance", "social", "forum", "voting", "coordination"];
+
+  const scores: Record<string, number> = {
+    defi: defiKw.reduce((s, kw) => s + (text.includes(kw) ? 1 : 0), 0),
+    "public-goods": publicKw.reduce((s, kw) => s + (text.includes(kw) ? 1 : 0), 0),
+    research: researchKw.reduce((s, kw) => s + (text.includes(kw) ? 1 : 0), 0),
+    community: communityKw.reduce((s, kw) => s + (text.includes(kw) ? 1 : 0), 0),
+  };
+
+  let best = "public-goods";
+  let max = 0;
+  for (const [pool, score] of Object.entries(scores)) {
+    if (score > max) { max = score; best = pool; }
+  }
+  return best;
 }

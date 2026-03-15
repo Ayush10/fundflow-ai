@@ -282,3 +282,43 @@ export function decisionFromOverallScore(
 
   return "rejected";
 }
+
+// ─── Risk Assessment ────────────────────────────────────────────────
+
+export function assessRisk(input: {
+  proposal: Proposal;
+  verification: HumanVerification;
+  research: UnbrowseResearch;
+  reputationScore?: number;
+}): { overall: number; budgetRisk: number; teamRisk: number; timelineRisk: number; marketRisk: number; flags: string[] } {
+  const flags: string[] = [];
+  const text = `${input.proposal.title} ${input.proposal.description}`.toLowerCase();
+
+  // Budget risk: higher amounts = more risk
+  let budgetRisk = 20;
+  if (input.proposal.requestedAmount > 50000) { budgetRisk = 85; flags.push("Very large funding request (>$50k)"); }
+  else if (input.proposal.requestedAmount > 25000) { budgetRisk = 65; flags.push("Large funding request (>$25k)"); }
+  else if (input.proposal.requestedAmount > 10000) { budgetRisk = 40; }
+  if (!text.includes("milestone") && !text.includes("tranche")) { budgetRisk += 10; flags.push("No milestone-based delivery mentioned"); }
+
+  // Team risk: low credibility = high risk
+  const rep = input.reputationScore ?? 50;
+  let teamRisk = clamp(100 - rep, 10, 95);
+  if (input.verification.humanityScore < 50) { teamRisk += 15; flags.push("Low humanity score"); }
+  if (!input.research.github) { teamRisk += 10; flags.push("No GitHub presence"); }
+  teamRisk = clamp(teamRisk, 0, 100);
+
+  // Timeline risk: vague proposals are riskier
+  let timelineRisk = 40;
+  if (text.includes("timeline") || text.includes("roadmap") || text.includes("phase")) { timelineRisk = 20; }
+  if (text.includes("asap") || text.includes("urgent")) { timelineRisk = 60; flags.push("Urgency language detected"); }
+
+  // Market risk
+  let marketRisk = 30;
+  if (text.includes("novel") || text.includes("first") || text.includes("new concept")) { marketRisk = 55; flags.push("Unproven market/concept"); }
+  if (text.includes("existing") || text.includes("proven") || text.includes("traction")) { marketRisk = 15; }
+
+  const overall = clamp(Math.round(budgetRisk * 0.3 + teamRisk * 0.35 + timelineRisk * 0.15 + marketRisk * 0.2), 0, 100);
+
+  return { overall, budgetRisk, teamRisk, timelineRisk, marketRisk, flags };
+}

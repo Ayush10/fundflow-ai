@@ -11,6 +11,7 @@ import {
   Clock,
   ExternalLink,
   Volume2,
+  Download,
 } from "lucide-react";
 import type { Proposal } from "@/types/api";
 import { getProposal } from "@/lib/api";
@@ -102,7 +103,20 @@ export default function ProposalDetailPage() {
             </span>
           </div>
         </div>
-        <StatusBadge status={proposal.status} />
+        <div className="flex items-center gap-2">
+          {hasDecision && (
+            <button
+              onClick={() => {
+                window.open(`/api/proposals/${id}/report`, "_blank");
+              }}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Report
+            </button>
+          )}
+          <StatusBadge status={proposal.status} />
+        </div>
       </motion.div>
 
       <div className="grid gap-6 lg:grid-cols-5">

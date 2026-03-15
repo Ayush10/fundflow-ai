@@ -2,17 +2,22 @@ import {
   addProposalToFounder,
   addTransaction,
   appendAgentEvent,
+  categorizeProposal,
+  createMilestones,
   getProposal,
   requireProposalRecord,
   setProposalDecision,
   setProposalResearch,
   setProposalStatus,
   setProposalVerification,
+  updateFundPool,
+  listFundPools,
   upsertFounder,
 } from "@/lib/store";
 import {
   decisionFromOverallScore,
   evaluateProposal,
+  assessRisk,
 } from "@/lib/agent/evaluator";
 import { runMultiAgentResearch } from "@/lib/agent/multi-agent";
 import { verifyHumanity } from "@/lib/integrations/human-tech";
@@ -220,20 +225,35 @@ async function executeEvaluation(proposalId: string): Promise<Proposal> {
 
   if (decision.decision === "approved") {
     appendAgentEvent(proposalId, { step: "on-chain", status: "transferring" });
-    // Disburse proportional amount
-    const disbursalProposal = { ...record.proposal, requestedAmount: approvedAmount };
+
+    // Auto-categorize into fund pool
+    const poolId = categorizeProposal(record.proposal.title, record.proposal.description);
+
+    // Create milestone-based funding (3 tranches: 30/30/40)
+    const milestones = createMilestones(proposalId, approvedAmount);
+    const firstTranche = milestones[0]?.trancheAmount ?? approvedAmount;
+
+    // Disburse first tranche only
+    const disbursalProposal = { ...record.proposal, requestedAmount: firstTranche };
     const disbursement = await disburseApprovedProposal(disbursalProposal);
     decision = { ...decision, disbursementTxHash: disbursement.txHash };
+
+    // Update fund pool disbursed amount
+    const pools = listFundPools();
+    const pool = pools.find((p) => p.id === poolId);
+    if (pool) {
+      updateFundPool(poolId, { disbursed: pool.disbursed + firstTranche });
+    }
 
     // Log to transaction ledger
     addTransaction({
       type: "disbursement",
-      amount: approvedAmount,
-      description: `Approved: ${record.proposal.title} (${overallScore}% score, ${Math.round(fundingRatio * 100)}% of requested)`,
+      amount: firstTranche,
+      description: `Tranche 1/3: ${record.proposal.title} (${overallScore}% score, ${Math.round(fundingRatio * 100)}% of requested $${record.proposal.requestedAmount.toLocaleString()})`,
       counterparty: record.proposal.applicantWallet.slice(0, 8) + "...",
       proposalId,
       txHash: disbursement.txHash,
-      pool: approvedAmount > 10000 ? "defi" : "public-goods",
+      pool: poolId,
     });
   }
 

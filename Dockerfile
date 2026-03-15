@@ -3,17 +3,17 @@ FROM node:22-alpine AS base
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN apk add --no-cache python3 make g++ linux-headers eudev-dev && \
+    npm ci && \
+    apk del python3 make g++ linux-headers eudev-dev
 
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG NEXT_PUBLIC_USE_MOCK=false
-ARG NEXT_PUBLIC_SOLANA_NETWORK=devnet
-ENV NEXT_PUBLIC_USE_MOCK=$NEXT_PUBLIC_USE_MOCK
-ENV NEXT_PUBLIC_SOLANA_NETWORK=$NEXT_PUBLIC_SOLANA_NETWORK
+ENV NEXT_PUBLIC_USE_MOCK=false
+ENV NEXT_PUBLIC_SOLANA_NETWORK=devnet
 RUN npm run build
 
 FROM base AS runner

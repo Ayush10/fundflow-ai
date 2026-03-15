@@ -9,6 +9,7 @@ import {
   Shield,
   Plus,
   Users,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import WalletButton from "@/components/layout/WalletButton";
@@ -19,6 +20,7 @@ const navItems = [
   { href: "/treasury", label: "Treasury", icon: Landmark },
   { href: "/audit", label: "Audit Trail", icon: Shield },
   { href: "/founders", label: "Founders", icon: Users },
+  { href: "/docs", label: "Docs", icon: BookOpen },
 ];
 
 export default function Navbar() {

@@ -19,6 +19,7 @@ import type {
 } from "@/types/api";
 import type { FounderProfile, AgentConversation, ReputationScore } from "@/types/agents";
 import type { TreasuryTransaction, FundPool } from "@/types/treasury";
+import * as persist from "@/lib/persist";
 
 interface ProposalRecord {
   proposal: Proposal;
@@ -83,9 +84,38 @@ function createSeedStore(): FundFlowStore {
 function getStore(): FundFlowStore {
   if (!global.__fundflowStore || global.__fundflowStore.version !== STORE_VERSION) {
     global.__fundflowStore = createSeedStore();
+    // Hydrate founders from PostgreSQL asynchronously
+    hydrateFromDB();
   }
 
   return global.__fundflowStore;
+}
+
+/** Load persistent data from PostgreSQL into the in-memory store. */
+async function hydrateFromDB() {
+  try {
+    const founders = await persist.loadFoundersFromDB();
+    if (founders.length > 0 && global.__fundflowStore) {
+      for (const f of founders) {
+        global.__fundflowStore.founders.set(f.wallet, f);
+      }
+      console.log(`[Store] Hydrated ${founders.length} founders from PostgreSQL`);
+    }
+    const txs = await persist.loadTransactionsFromDB();
+    if (txs.length > 0 && global.__fundflowStore) {
+      // Merge DB transactions with seed, deduplicate by id
+      const existing = new Set(global.__fundflowStore.transactions.map((t) => t.id));
+      for (const tx of txs) {
+        if (!existing.has(tx.id)) {
+          global.__fundflowStore.transactions.push(tx);
+        }
+      }
+      global.__fundflowStore.transactions.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      console.log(`[Store] Hydrated ${txs.length} transactions from PostgreSQL`);
+    }
+  } catch (err) {
+    console.warn("[Store] DB hydration failed (running in memory-only mode):", (err as Error).message);
+  }
 }
 
 export function listProposals(): Proposal[] {
@@ -132,6 +162,7 @@ export function createProposal(input: CreateProposalRequest): Proposal {
     events: [],
   });
 
+  persist.persistProposal(proposal);
   return structuredClone(proposal);
 }
 
@@ -149,6 +180,7 @@ export function setProposalStatus(
   proposalId: string,
   status: Proposal["status"]
 ): ProposalRecord {
+  persist.persistProposalStatus(proposalId, status);
   return updateProposalRecord(proposalId, (record) => {
     record.proposal.status = status;
   });
@@ -177,7 +209,7 @@ export function setProposalDecision(
   decision: AgentDecision,
   auditRecord?: AuditRecord
 ): ProposalRecord {
-  return updateProposalRecord(proposalId, (record) => {
+  const result = updateProposalRecord(proposalId, (record) => {
     record.decision = decision;
     record.proposal.decision = decision;
     record.proposal.status = decision.decision;
@@ -185,6 +217,8 @@ export function setProposalDecision(
       record.auditRecord = auditRecord;
     }
   });
+  persist.persistProposal(result.proposal);
+  return result;
 }
 
 export function appendAgentEvent(
@@ -241,6 +275,7 @@ export function getAuditRecordByAssetAddress(
 
 export function addAuditRecord(auditRecord: AuditRecord): AuditRecord {
   getStore().auditRecords.unshift(auditRecord);
+  persist.persistAuditRecord(auditRecord);
   return structuredClone(auditRecord);
 }
 
@@ -250,6 +285,7 @@ export function getTreasuryState(): TreasuryState {
 
 export function setTreasuryState(treasury: TreasuryState): TreasuryState {
   getStore().treasury = structuredClone(treasury);
+  persist.persistTreasuryState(treasury);
   return getTreasuryState();
 }
 
@@ -287,6 +323,7 @@ export function upsertFounder(partial: Partial<FounderProfile> & { wallet: strin
   };
 
   store.founders.set(partial.wallet, profile);
+  persist.persistFounder(profile);
   return structuredClone(profile);
 }
 
@@ -328,6 +365,7 @@ export function addTransaction(tx: Omit<TreasuryTransaction, "id" | "timestamp">
     timestamp: new Date().toISOString(),
   };
   getStore().transactions.unshift(full);
+  persist.persistTransaction(full);
   return structuredClone(full);
 }
 
@@ -351,13 +389,16 @@ export function addProposalToFounder(
   const profile = store.founders.get(wallet);
   if (!profile) return null;
 
-  profile.proposals.push({ ...entry, date: new Date().toISOString() });
+  const date = new Date().toISOString();
+  profile.proposals.push({ ...entry, date });
   profile.totalRequested += entry.amount;
   if (entry.decision === "approved") {
     profile.totalFunded += entry.amount;
   }
-  profile.lastSeen = new Date().toISOString();
+  profile.lastSeen = date;
 
   store.founders.set(wallet, profile);
+  persist.persistFounder(profile);
+  persist.persistFounderProposal(wallet, { ...entry, date });
   return structuredClone(profile);
 }

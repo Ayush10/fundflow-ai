@@ -1,65 +1,254 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import {
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Shield,
+  ArrowRight,
+  Zap,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import type { Proposal, TreasuryState, AuditRecord } from "@/types/api";
+import { getProposals, getTreasury, getAuditRecords } from "@/lib/api";
+import StatCard from "@/components/ui/StatCard";
+import StatusBadge from "@/components/ui/StatusBadge";
+import Card, { CardHeader, CardTitle } from "@/components/ui/Card";
+import { PageLoader } from "@/components/ui/LoadingSpinner";
+import { formatUSDC, formatDate, shortenAddress, getScoreColor } from "@/lib/utils";
+
+export default function DashboardPage() {
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [treasury, setTreasury] = useState<TreasuryState | null>(null);
+  const [auditRecords, setAuditRecords] = useState<AuditRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const [p, t, a] = await Promise.all([
+      getProposals(),
+      getTreasury(),
+      getAuditRecords(),
+    ]);
+    setProposals(p);
+    setTreasury(t);
+    setAuditRecords(a);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    Promise.all([getProposals(), getTreasury(), getAuditRecords()]).then(
+      ([p, t, a]) => {
+        setProposals(p);
+        setTreasury(t);
+        setAuditRecords(a);
+        setLoading(false);
+      }
+    );
+  }, []);
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  if (loading || !treasury) return <PageLoader />;
+
+  const approved = proposals.filter((p) => p.status === "approved").length;
+  const pending = proposals.filter(
+    (p) => p.status === "pending" || p.status === "evaluating"
+  ).length;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="space-y-8">
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-500/10 via-transparent to-cyan-500/10 p-8"
+      >
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 text-sm text-violet-400">
+            <Zap className="h-4 w-4" />
+            Autonomous Grant Allocation on Solana
+          </div>
+          <h1 className="mt-3 text-4xl font-bold">
+            Fund<span className="gradient-text">Flow</span> AI
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-2 max-w-xl text-gray-400">
+            AI-powered proposal evaluation with on-chain audit trails. Verify
+            humanity, research viability, score proposals, and disburse USDC —
+            all autonomously.
           </p>
+          <div className="mt-6 flex gap-3">
+            <Link
+              href="/proposals/new"
+              className="rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-500"
+            >
+              Submit Proposal
+            </Link>
+            <Link
+              href="/audit"
+              className="rounded-lg border border-white/10 px-5 py-2.5 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/5"
+            >
+              View Audit Trail
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        {/* Decorative gradient blob */}
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-600/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-cyan-600/20 blur-3xl" />
+      </motion.div>
+
+      {/* Stats */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        <StatCard
+          label="Treasury Balance"
+          value={formatUSDC(treasury.usdcBalance)}
+          icon={DollarSign}
+        />
+        <StatCard
+          label="Meteora Yield"
+          value={formatUSDC(treasury.meteoraYieldEarned)}
+          icon={TrendingUp}
+          trend="+2.4% APY"
+          trendUp
+        />
+        <StatCard
+          label="Proposals"
+          value={`${approved} approved / ${pending} pending`}
+          icon={FileText}
+        />
+        <StatCard
+          label="Audit Records"
+          value={`${auditRecords.length} on-chain`}
+          icon={Shield}
+        />
+      </motion.div>
+
+      {/* Two column: Recent proposals + Audit trail */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Recent Proposals */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Proposals</CardTitle>
+              <Link
+                href="/proposals"
+                className="flex items-center gap-1 text-sm text-violet-400 hover:text-violet-300"
+              >
+                View all <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </CardHeader>
+            <div className="space-y-3">
+              {proposals.slice(0, 4).map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/proposals/${p.id}`}
+                  className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3 transition-colors hover:bg-white/5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">
+                      {p.title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {formatUSDC(p.requestedAmount)} &middot;{" "}
+                      {shortenAddress(p.applicantWallet)}
+                    </p>
+                  </div>
+                  <StatusBadge status={p.status} />
+                </Link>
+              ))}
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Recent Audit Records */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Audit Trail</CardTitle>
+              <Link
+                href="/audit"
+                className="flex items-center gap-1 text-sm text-violet-400 hover:text-violet-300"
+              >
+                View all <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </CardHeader>
+            <div className="space-y-3">
+              {auditRecords.slice(0, 4).map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">
+                      {record.proposalTitle}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {formatDate(record.timestamp)} &middot;{" "}
+                      {shortenAddress(record.applicantWallet)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-sm font-bold ${getScoreColor(
+                        record.score
+                      )}`}
+                    >
+                      {record.score}
+                    </span>
+                    <StatusBadge status={record.decision} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+
+      {/* Tech badges */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.4 }}
+        className="flex flex-wrap items-center justify-center gap-3 pt-4"
+      >
+        {[
+          "Solana",
+          "Metaplex Core",
+          "Meteora",
+          "LangChain",
+          "Claude AI",
+          "human.tech",
+          "Unbrowse",
+          "ElevenLabs",
+        ].map((tech) => (
+          <span
+            key={tech}
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-gray-400"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            {tech}
+          </span>
+        ))}
+      </motion.div>
     </div>
   );
 }

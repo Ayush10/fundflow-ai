@@ -5,6 +5,7 @@ import {
 } from "@metaplex-foundation/umi";
 import {
   create,
+  createCollection,
   mplCore,
 } from "@metaplex-foundation/mpl-core";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
@@ -12,26 +13,24 @@ import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 import { getAppConfig } from "@/lib/config";
 import { getSolanaConnection, getTreasuryAuthority } from "@/lib/solana";
 
-// Store the registered agent asset address
+// Cached registration
 let registeredAgentAsset: string | null = null;
 let registeredCollection: string | null = null;
 
+const AGENT_NAME = "FundFlow AI Agent";
+const AGENT_URI = "https://fundflow.ayushojha.com/agent-metadata.json";
+
 /**
- * Register FundFlow AI as an agent in the Metaplex Agent Registry.
- *
- * This creates:
- * 1. A collection for FundFlow decision records
- * 2. An MPL Core asset representing the FundFlow AI agent
- * 3. Registers the agent identity with lifecycle hooks
- *
- * This is a one-time operation. Subsequent calls return the cached asset address.
+ * Register FundFlow AI as an agent on Solana:
+ * 1. Create a collection for decision records
+ * 2. Create a Core asset representing the agent identity
+ * 3. Register in the Metaplex Agent Registry with metadata URI
  */
 export async function registerFundFlowAgent(): Promise<{
   agentAssetAddress: string;
   collectionAddress: string;
   mode: "live" | "simulated";
 }> {
-  // Return cached if already registered
   if (registeredAgentAsset && registeredCollection) {
     return {
       agentAssetAddress: registeredAgentAsset,
@@ -58,12 +57,26 @@ export async function registerFundFlowAgent(): Promise<{
     const umiKeypair = fromWeb3JsKeypair(authority);
     umi.use(keypairIdentity(umiKeypair));
 
-    // 1. Create the agent identity asset (standalone, no collection)
+    // 1. Create a collection for FundFlow decision records
+    const collection = generateSigner(umi);
+    await createCollection(umi, {
+      collection,
+      name: "FundFlow AI Decisions",
+      uri: AGENT_URI,
+    }).sendAndConfirm(umi);
+
+    console.log(
+      "[Agent Registry] Collection created:",
+      collection.publicKey.toString()
+    );
+
+    // 2. Create the agent identity asset within the collection
     const agentAsset = generateSigner(umi);
     await create(umi, {
       asset: agentAsset,
-      name: "FundFlow AI Agent",
-      uri: "",
+      name: AGENT_NAME,
+      uri: AGENT_URI,
+      collection: collection.publicKey,
     }).sendAndConfirm(umi);
 
     console.log(
@@ -87,19 +100,20 @@ export async function registerFundFlowAgent(): Promise<{
 
       await registerIdentityV1(registryUmi, {
         asset: agentAsset.publicKey,
+        collection: collection.publicKey,
+        agentRegistrationUri: AGENT_URI,
       }).sendAndConfirm(registryUmi);
 
-      console.log("[Agent Registry] Identity registered successfully");
+      console.log("[Agent Registry] Identity registered in Agent Registry");
     } catch (regErr) {
-      // Registration may fail on devnet if program not deployed
       console.warn(
-        "[Agent Registry] Identity registration skipped (program may not be on devnet):",
+        "[Agent Registry] Registry registration skipped:",
         regErr instanceof Error ? regErr.message : regErr
       );
     }
 
     registeredAgentAsset = agentAsset.publicKey.toString();
-    registeredCollection = agentAsset.publicKey.toString(); // Use agent asset as reference
+    registeredCollection = collection.publicKey.toString();
 
     return {
       agentAssetAddress: registeredAgentAsset,
@@ -119,9 +133,6 @@ export async function registerFundFlowAgent(): Promise<{
   }
 }
 
-/**
- * Get the registered agent and collection addresses.
- */
 export function getRegisteredAgent() {
   return {
     agentAssetAddress: registeredAgentAsset,

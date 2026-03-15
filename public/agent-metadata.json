@@ -1,0 +1,22 @@
+{
+  "name": "FundFlow AI Agent",
+  "description": "Autonomous on-chain grant allocator. 5 AI agents collaboratively evaluate proposals, verify identities, research credentials across 6 platforms, and execute USDC disbursements on Solana.",
+  "image": "https://fundflow.ayushojha.com/logo.svg",
+  "external_url": "https://fundflow.ayushojha.com",
+  "attributes": [
+    { "trait_type": "Type", "value": "Grant Allocator" },
+    { "trait_type": "Agent Count", "value": "5" },
+    { "trait_type": "Platforms", "value": "Twitter, GitHub, Reddit, HackerNews, Google, YC" },
+    { "trait_type": "Blockchain", "value": "Solana Devnet" },
+    { "trait_type": "Voice", "value": "ElevenLabs (5 voices)" },
+    { "trait_type": "AI Model", "value": "GPT-4o" },
+    { "trait_type": "Identity", "value": "human.tech Passport" },
+    { "trait_type": "Yield", "value": "Meteora Dynamic Vault" },
+    { "trait_type": "Research", "value": "Unbrowse Browser Agent" },
+    { "trait_type": "Builder", "value": "Ayush Ojha" }
+  ],
+  "properties": {
+    "category": "agent",
+    "creators": [{ "address": "Dn1SDTkoA5tmSLAsf5inTsGhY7twbcEcSdKZTDmbGxjZ", "share": 100 }]
+  }
+}

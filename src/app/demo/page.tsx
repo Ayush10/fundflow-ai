@@ -144,15 +144,13 @@ export default function DemoPage() {
       };
 
       audio.onended = () => {
-        setPhase("dashboard");
-        setTimeout(() => setPhase("typing-proposal"), 3000);
+        setPhase("typing-proposal");
       };
 
       await audio.play();
     } catch {
       // Skip tour if fails
-      setPhase("dashboard");
-      setTimeout(() => setPhase("typing-proposal"), 3000);
+      setPhase("typing-proposal");
     }
   }, []);
 
@@ -268,32 +266,39 @@ export default function DemoPage() {
         </div>
       )}
 
-      {/* ── TOUR: Playing ── */}
+      {/* ── TOUR: Playing — shows real dashboard via iframe with subtitle overlay ── */}
       {phase === "tour-playing" && (
-        <div className="flex min-h-screen items-center justify-center px-8">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-3xl text-center">
-            <div className="mb-8">
-              <Volume2 className="h-10 w-10 text-violet-400 mx-auto mb-4 animate-pulse" />
-              <h2 className="text-2xl font-bold text-white mb-2">Guided Tour</h2>
-            </div>
-            <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-6 mb-6">
+        <div className="relative w-full h-screen">
+          {/* Real dashboard embedded */}
+          <iframe
+            src="/"
+            className="w-full h-full border-0"
+            title="FundFlow AI Dashboard"
+          />
+
+          {/* Subtitle overlay at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-gray-950 via-gray-950/95 to-transparent pt-12 pb-4 px-4">
+            <div className="max-w-2xl mx-auto">
               <AnimatePresence mode="wait">
-                <motion.p
+                <motion.div
                   key={tourSubtitle}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="text-lg text-gray-200 leading-relaxed"
+                  className="rounded-xl bg-gray-950/90 border border-violet-500/20 px-5 py-3 text-center backdrop-blur-xl mb-3"
                 >
-                  {tourSubtitle || "Welcome to FundFlow AI..."}
-                </motion.p>
+                  <p className="text-sm text-gray-200 leading-relaxed">{tourSubtitle || "Welcome to FundFlow AI..."}</p>
+                </motion.div>
               </AnimatePresence>
+              <div className="flex items-center gap-3">
+                <Volume2 className="h-4 w-4 text-violet-400 animate-pulse shrink-0" />
+                <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${tourProgress}%` }} />
+                </div>
+                <span className="text-[10px] text-gray-500 shrink-0">ElevenLabs</span>
+              </div>
             </div>
-            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full bg-violet-500 transition-all duration-300" style={{ width: `${tourProgress}%` }} />
-            </div>
-            <p className="mt-2 text-xs text-gray-600">ElevenLabs TTS — 6 sponsor integrations</p>
-          </motion.div>
+          </div>
         </div>
       )}
 

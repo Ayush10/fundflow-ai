@@ -220,7 +220,7 @@ export async function researchHackerNews(
     const hits = (d.hits ?? d.results ?? d.stories) as unknown[];
     const count = Array.isArray(hits) ? hits.length : 0;
     const totalPoints = Array.isArray(hits)
-      ? hits.reduce((sum, h) => sum + toNum((h as Record<string, unknown>).points), 0)
+      ? hits.reduce((sum: number, h) => sum + toNum((h as Record<string, unknown>).points), 0)
       : 0;
     return {
       platform: "hackernews",

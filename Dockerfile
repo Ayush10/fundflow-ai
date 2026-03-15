@@ -51,7 +51,9 @@ ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMIUM_PATH=/usr/bin/chromium
 
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+    adduser --system --uid 1001 --home /home/nextjs nextjs && \
+    mkdir -p /home/nextjs/.unbrowse && \
+    chown -R nextjs:nodejs /home/nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
@@ -62,6 +64,7 @@ COPY --chown=nextjs:nodejs entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 USER nextjs
+ENV HOME=/home/nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"

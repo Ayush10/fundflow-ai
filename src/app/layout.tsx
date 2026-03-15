@@ -5,6 +5,7 @@ import Navbar from "@/components/layout/Navbar";
 import WalletProvider from "@/components/layout/WalletProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import IntroVoiceover from "@/components/voice/IntroVoiceover";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,6 +31,7 @@ export default function RootLayout({
             <main className="mx-auto max-w-7xl px-4 pb-16 pt-20 sm:px-6">
               <ErrorBoundary>{children}</ErrorBoundary>
             </main>
+            <IntroVoiceover />
           </ToastProvider>
         </WalletProvider>
       </body>

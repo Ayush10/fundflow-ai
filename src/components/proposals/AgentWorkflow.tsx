@@ -25,6 +25,7 @@ import type {
   AgentDecision,
 } from "@/types/api";
 import { subscribeToAgentEvents } from "@/lib/api";
+import { useSounds } from "@/hooks/useSounds";
 import ScoreBar from "@/components/ui/ScoreBar";
 import { cn, solanaExplorerUrl } from "@/lib/utils";
 
@@ -71,6 +72,7 @@ export default function AgentWorkflow({
   const [state, setState] = useState<WorkflowState>(initialState);
   const [isRunning, setIsRunning] = useState(false);
   const cancelRef = useRef<(() => void) | null>(null);
+  const { play } = useSounds();
 
   useEffect(() => {
     return () => {
@@ -87,6 +89,19 @@ export default function AgentWorkflow({
     const cancel = subscribeToAgentEvents(
       proposalId,
       (event: AgentEvent) => {
+        // Play sounds on step completions
+        if (event.step === "human-check" && event.status === "passed") play("step-complete");
+        if (event.step === "human-check" && event.status === "failed") play("failure");
+        if (event.step === "unbrowse-research" && event.status === "complete") play("step-complete");
+        if (event.step === "ai-evaluation" && event.status === "complete") play("step-complete");
+        if (event.step === "decision" && event.status === "complete") {
+          const dec = event.data as AgentDecision | undefined;
+          if (dec?.decision === "approved") play("approved");
+          else if (dec?.decision === "rejected") play("failure");
+          else play("notification");
+        }
+        if (event.step === "on-chain" && event.status === "complete") play("success");
+
         setState((prev) => {
           const next = { ...prev };
           switch (event.step) {

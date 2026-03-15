@@ -4,6 +4,21 @@ import { createContext, useContext, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, AlertTriangle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { SoundName } from "@/hooks/useSounds";
+
+const toastSounds: Record<ToastType, SoundName> = {
+  success: "success",
+  error: "error",
+  warning: "notification",
+};
+
+function playSound(name: SoundName) {
+  try {
+    const audio = new Audio(`/sounds/${name}.wav`);
+    audio.volume = 0.4;
+    audio.play().catch(() => {});
+  } catch {}
+}
 
 type ToastType = "success" | "error" | "warning";
 
@@ -42,6 +57,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const addToast = useCallback((message: string, type: ToastType = "success") => {
     const id = crypto.randomUUID();
+    playSound(toastSounds[type]);
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));

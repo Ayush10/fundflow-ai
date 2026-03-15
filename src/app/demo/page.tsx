@@ -193,7 +193,7 @@ export default function DemoPage() {
         }
 
         if (event.step === "ai-evaluation" && event.status === "complete" && event.data) {
-          setEvalScores(event.data as Record<string, number>);
+          setEvalScores(event.data as unknown as Record<string, number>);
         }
 
         if (event.step === "decision" && event.status === "complete" && event.data) {

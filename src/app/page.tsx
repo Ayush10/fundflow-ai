@@ -72,6 +72,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Hero */}
       <motion.div
+        id="tour-hero"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-500/10 via-transparent to-cyan-500/10 p-8"
@@ -111,6 +112,7 @@ export default function DashboardPage() {
 
       {/* Stats */}
       <motion.div
+        id="tour-stats"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
@@ -141,19 +143,27 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Funding Charts + Approval Rates */}
-      <FundingCharts />
+      <div id="tour-funding">
+        <FundingCharts />
+      </div>
 
       {/* Fund Pools + Treasury Alerts */}
-      <DashboardCharts />
+      <div id="tour-pools">
+        <DashboardCharts />
+      </div>
 
       {/* Activity Feed */}
-      <ActivityFeed />
+      <div id="tour-activity">
+        <ActivityFeed />
+      </div>
 
       {/* On-Chain Status */}
-      <OnChainStatus />
+      <div id="tour-onchain">
+        <OnChainStatus />
+      </div>
 
       {/* Two column: Recent proposals + Audit trail */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div id="tour-proposals" className="grid gap-6 lg:grid-cols-2">
         {/* Recent Proposals */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -246,7 +256,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Sponsor Integrations Showcase */}
-      <SponsorShowcase />
+      <div id="tour-sponsors">
+        <SponsorShowcase />
+      </div>
     </div>
   );
 }

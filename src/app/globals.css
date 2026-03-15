@@ -40,3 +40,28 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Guided tour highlight */
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3), 0 0 20px rgba(139, 92, 246, 0.1); }
+  50% { box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.5), 0 0 30px rgba(139, 92, 246, 0.2); }
+}
+
+.tour-highlight-active {
+  animation: tour-pulse 2s ease-in-out infinite;
+  border-radius: 16px;
+  position: relative;
+  z-index: 10;
+  transition: box-shadow 0.5s ease;
+}
+
+/* Dim non-active sections during tour */
+body.tour-active > main > div > *:not(.tour-highlight-active) {
+  opacity: 0.4;
+  transition: opacity 0.5s ease;
+}
+
+body.tour-active > main > div > .tour-highlight-active {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}

@@ -148,11 +148,11 @@ export async function loadFoundersFromDB(): Promise<FounderProfile[]> {
       wallet: f.wallet,
       name: f.name ?? undefined,
       bio: f.bio ?? undefined,
-      platforms: f.platforms as FounderProfile["platforms"],
+      platforms: (typeof f.platforms === "string" ? JSON.parse(f.platforms) : f.platforms) as FounderProfile["platforms"],
       reputationScore: f.reputation_score,
       proposals: proposalsByWallet.get(f.wallet) ?? [],
-      firstSeen: String(f.first_seen),
-      lastSeen: String(f.last_seen),
+      firstSeen: f.first_seen instanceof Date ? f.first_seen.toISOString() : String(f.first_seen),
+      lastSeen: f.last_seen instanceof Date ? f.last_seen.toISOString() : String(f.last_seen),
       totalFunded: Number(f.total_funded),
       totalRequested: Number(f.total_requested),
     }));
@@ -164,8 +164,18 @@ export async function loadFoundersFromDB(): Promise<FounderProfile[]> {
 export async function loadTransactionsFromDB(): Promise<TreasuryTransaction[]> {
   if (!hasDatabase()) return [];
   try {
-    const rows = await query<TreasuryTransaction>(`SELECT * FROM treasury_transactions ORDER BY timestamp DESC`);
-    return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
+    const rows = await query<Record<string, unknown>>(`SELECT * FROM treasury_transactions ORDER BY timestamp DESC`);
+    return rows.map((r) => ({
+      id: String(r.id),
+      type: String(r.type) as TreasuryTransaction["type"],
+      amount: Number(r.amount),
+      description: String(r.description),
+      counterparty: r.counterparty ? String(r.counterparty) : undefined,
+      proposalId: r.proposal_id ? String(r.proposal_id) : undefined,
+      txHash: r.tx_hash ? String(r.tx_hash) : undefined,
+      pool: r.pool ? String(r.pool) : undefined,
+      timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : String(r.timestamp),
+    }));
   } catch {
     return [];
   }

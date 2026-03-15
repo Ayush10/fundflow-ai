@@ -2,54 +2,51 @@ import { getAppConfig } from "@/lib/config";
 import { stableNumberFromText } from "@/lib/utils";
 import type { HumanVerification } from "@/types/api";
 
-function normalizeVerification(
-  wallet: string,
-  payload: unknown
-): HumanVerification {
-  const data = payload as Record<string, unknown>;
-  const humanityScore = Number(data.humanityScore ?? data.score ?? 0);
+const PASSPORT_API_BASE = "https://api.passport.xyz";
 
-  return {
-    wallet,
-    humanityScore,
-    verified: Boolean(
-      data.verified ?? humanityScore >= getAppConfig().minHumanityScore
-    ),
-    passportId:
-      typeof data.passportId === "string"
-        ? data.passportId
-        : typeof data.id === "string"
-          ? data.id
-          : undefined,
-    checkedAt:
-      typeof data.checkedAt === "string"
-        ? data.checkedAt
-        : new Date().toISOString(),
-  };
-}
-
-export async function verifyHumanity(wallet: string): Promise<HumanVerification> {
+export async function verifyHumanity(
+  wallet: string
+): Promise<HumanVerification> {
   const config = getAppConfig();
 
-  if (config.liveHumanTech && config.humanTechApiUrl) {
+  if (config.liveHumanTech && config.humanTechApiKey && config.humanTechScorerId) {
     try {
-      const response = await fetch(config.humanTechApiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.humanTechApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ wallet }),
-      });
+      const response = await fetch(
+        `${PASSPORT_API_BASE}/v2/stamps/${config.humanTechScorerId}/score/${wallet}`,
+        {
+          headers: {
+            "X-API-KEY": config.humanTechApiKey,
+            Accept: "application/json",
+          },
+        }
+      );
 
       if (response.ok) {
-        return normalizeVerification(wallet, await response.json());
+        const data = (await response.json()) as Record<string, unknown>;
+
+        // Passport API returns score as a string or number
+        const evidence = data.evidence as Record<string, unknown> | undefined;
+        const rawScore =
+          data.score ?? evidence?.rawScore ?? data.unique_humanity_score ?? 0;
+        const humanityScore = Math.round(Number(rawScore));
+        const passingScore = Boolean(data.passing_score);
+
+        return {
+          wallet,
+          humanityScore,
+          verified: passingScore || humanityScore >= config.minHumanityScore,
+          passportId: typeof data.stamp_id === "string"
+            ? data.stamp_id
+            : `passport_${wallet.slice(0, 8)}`,
+          checkedAt: new Date().toISOString(),
+        };
       }
     } catch {
       // Fall through to deterministic demo mode.
     }
   }
 
+  // Deterministic fallback
   const normalizedWallet = wallet.toLowerCase();
   const humanityScore =
     normalizedWallet.includes("bot") || normalizedWallet.includes("sybil")

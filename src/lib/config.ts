@@ -5,6 +5,7 @@ export interface AppConfig {
   openaiModel: string;
   humanTechApiKey?: string;
   humanTechApiUrl?: string;
+  humanTechScorerId?: string;
   unbrowseApiKey?: string;
   unbrowseApiUrl?: string;
   elevenLabsApiKey?: string;
@@ -52,6 +53,7 @@ export function getAppConfig(): AppConfig {
     openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o",
     humanTechApiKey,
     humanTechApiUrl: process.env.HUMAN_TECH_API_URL,
+    humanTechScorerId: process.env.HUMAN_TECH_SCORER_ID,
     unbrowseApiKey,
     unbrowseApiUrl: process.env.UNBROWSE_API_URL,
     elevenLabsApiKey,
@@ -68,7 +70,9 @@ export function getAppConfig(): AppConfig {
       toBoolean(process.env.ENABLE_REAL_ANTHROPIC) &&
       (Boolean(anthropicApiKey) || Boolean(openaiApiKey)),
     liveHumanTech:
-      toBoolean(process.env.ENABLE_REAL_HUMAN_TECH) && Boolean(humanTechApiKey),
+      toBoolean(process.env.ENABLE_REAL_HUMAN_TECH) &&
+      Boolean(humanTechApiKey) &&
+      Boolean(process.env.HUMAN_TECH_SCORER_ID),
     liveUnbrowse:
       toBoolean(process.env.ENABLE_REAL_UNBROWSE) && Boolean(unbrowseApiKey),
     liveElevenLabs:
